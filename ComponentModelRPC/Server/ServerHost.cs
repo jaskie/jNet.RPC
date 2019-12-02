@@ -127,7 +127,7 @@ namespace ComponentModelRPC.Server
 
         public void UnInitialize()
         {
-            _listenerThread.Abort();
+            _listenerThread?.Abort();
         }
 
         public override string ToString()
