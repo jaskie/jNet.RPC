@@ -22,15 +22,15 @@ namespace jNet.RPC.Server
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
 
-        public ServerSession(TcpClient client, IDto initialObject, Func<IPAddress, IPrincipal> findUserFunc): base(client, new ServerReferenceResolver())
+        public ServerSession(TcpClient client, IDto initialObject, IPrincipalProvider principalProvider): base(client, new ServerReferenceResolver())
         {
             _initialObject = initialObject;
            
-            if (!(client.Client.RemoteEndPoint is IPEndPoint endPoint))
-                throw new UnauthorizedAccessException($"Client RemoteEndpoint {Client.Client.RemoteEndPoint} is invalid");
-            _sessionUser = findUserFunc(endPoint.Address);
+            if (!(client.Client.RemoteEndPoint is IPEndPoint))
+                throw new UnauthorizedAccessException("Client RemoteEndpoint is invalid");
+            _sessionUser = principalProvider.GetPrincipal(client);
             if (_sessionUser == null)
-                throw new UnauthorizedAccessException($"Access from {Client.Client.RemoteEndPoint} not allowed");
+                throw new UnauthorizedAccessException($"Client {Client.Client.RemoteEndPoint} not allowed");
             ((ServerReferenceResolver)ReferenceResolver).ReferencePropertyChanged += ReferenceResolver_ReferencePropertyChanged;
             StartThreads();
         }

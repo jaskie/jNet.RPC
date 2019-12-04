@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Security.Principal;
 using System.Threading;
 using System.Xml.Serialization;
 using NLog;
@@ -17,19 +16,19 @@ namespace jNet.RPC.Server
         private TcpListener _listener;
         private Thread _listenerThread;
         private IDto _rootDto;
-        private Func<IPAddress, IPrincipal> _findUserFunc;
+        private IPrincipalProvider _principalProvider;
         private readonly List<ServerSession> _clients = new List<ServerSession>();
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         
         [XmlAttribute]
         public ushort ListenPort { get; set; }
 
-        public bool Initialize(DtoBase rootDto, Func<IPAddress, IPrincipal> findUserFunc)
+        public bool Initialize(DtoBase rootDto, IPrincipalProvider principalProvider)
         {
             if (ListenPort < 1024)
                 return false;
             _rootDto = rootDto;
-            _findUserFunc = findUserFunc;
+            _principalProvider = principalProvider;
             try
             {
                 _listener = new TcpListener(IPAddress.Any, ListenPort) {ExclusiveAddressUse = true};
@@ -95,7 +94,7 @@ namespace jNet.RPC.Server
 
         private void AddClient(TcpClient client)
         {
-            var clientSession = new ServerSession(client, _rootDto, _findUserFunc);
+            var clientSession = new ServerSession(client, _rootDto, _principalProvider);
             clientSession.Disconnected += ClientSessionDisconnected;
             lock (((IList)_clients).SyncRoot)
                 _clients.Add(clientSession);

@@ -66,6 +66,8 @@
     <Compile Include="Client\ProxyBaseEventArgs.cs" />
     <Compile Include="IRemoteHostConfig.cs" />
     <Compile Include="PropertyChangedWithValueEventArgs.cs" />
+    <Compile Include="Server\IPrincipalProvider.cs" />
+    <Compile Include="Server\PrincipalProvider.cs" />
     <Compile Include="Server\ServerReferenceResolver.cs" />
     <Compile Include="Client\ProxyBase.cs" />
     <Compile Include="Client\RemoteClient.cs" />
