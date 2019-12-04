@@ -1,4 +1,4 @@
-# ComponentModelRPC
+# jNet.RPC
 This project was created as easy to use Remote Procedure Call (RPC) in client-server object environment.
 
 There are plenty of communication means and frameworks, but almost all of them requires us to communicate with server through keyhole. This library is response to my personal need to have a tool that allow me to have, at client, reflection of all obtained server objects. And use them in a way as if they were local, through network.
