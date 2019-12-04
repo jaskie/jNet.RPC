@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace ComponentModelRPC
+namespace jNet.RPC
 {
     internal class WrappedEventArgs: EventArgs
     {

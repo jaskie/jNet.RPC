@@ -1,6 +1,6 @@
 ﻿using System.Xml.Serialization;
 
-namespace ComponentModelRPC
+namespace jNet.RPC
 {
     public interface IRemoteHostConfig
     {

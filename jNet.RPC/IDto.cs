@@ -1,7 +1,7 @@
 ﻿using System;
 using System.ComponentModel;
 
-namespace ComponentModelRPC
+namespace jNet.RPC
 {
     public interface IDto: INotifyPropertyChanged, IDisposable
     {

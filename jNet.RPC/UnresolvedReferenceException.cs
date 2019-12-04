@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace ComponentModelRPC
+namespace jNet.RPC
 {
     public class UnresolvedReferenceException: Exception
     {

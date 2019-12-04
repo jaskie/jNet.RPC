@@ -4,7 +4,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using Newtonsoft.Json;
 
-namespace ComponentModelRPC
+namespace jNet.RPC
 {
     [JsonObject(IsReference = false)]
     internal class PropertyChangedWithDataEventArgs : PropertyChangedEventArgs

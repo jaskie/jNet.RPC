@@ -9,7 +9,7 @@ using System.Threading;
 using System.Xml.Serialization;
 using NLog;
 
-namespace ComponentModelRPC.Server
+namespace jNet.RPC.Server
 {
     public class ServerHost : IDisposable, IRemoteHostConfig
     {

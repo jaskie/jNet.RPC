@@ -10,7 +10,7 @@ using System.Threading;
 using System.Xml.Serialization;
 using Newtonsoft.Json;
 
-namespace ComponentModelRPC.Server
+namespace jNet.RPC.Server
 {
     [JsonObject(ItemTypeNameHandling = TypeNameHandling.Objects, IsReference = true, MemberSerialization = MemberSerialization.OptIn)]
     public abstract class DtoBase: IDto

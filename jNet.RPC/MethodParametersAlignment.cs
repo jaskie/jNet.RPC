@@ -3,7 +3,7 @@ using System.IO;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace ComponentModelRPC
+namespace jNet.RPC
 {
     internal static class MethodParametersAlignment
     {

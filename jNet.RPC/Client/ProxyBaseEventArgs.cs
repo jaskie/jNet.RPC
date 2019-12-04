@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace ComponentModelRPC.Client
+namespace jNet.RPC.Client
 {
     internal class ProxyBaseEventArgs: EventArgs
     {

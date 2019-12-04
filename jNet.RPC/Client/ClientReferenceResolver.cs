@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.Threading;
 using Newtonsoft.Json.Serialization;
 
-namespace ComponentModelRPC.Client
+namespace jNet.RPC.Client
 {
     internal class ClientReferenceResolver : IReferenceResolver, IDisposable
     {

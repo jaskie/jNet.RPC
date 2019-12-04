@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Threading;
 using Newtonsoft.Json.Serialization;
 
-namespace ComponentModelRPC.Server
+namespace jNet.RPC.Server
 {
     internal class ServerReferenceResolver : IReferenceResolver, IDisposable
     {

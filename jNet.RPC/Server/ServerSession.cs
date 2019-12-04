@@ -12,7 +12,7 @@ using System.Reflection;
 using System.Security.Principal;
 using System.Threading;
 
-namespace ComponentModelRPC.Server
+namespace jNet.RPC.Server
 {
     internal class ServerSession : SocketConnection
     {

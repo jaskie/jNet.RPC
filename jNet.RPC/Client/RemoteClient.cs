@@ -8,7 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using Newtonsoft.Json.Serialization;
 
-namespace ComponentModelRPC.Client
+namespace jNet.RPC.Client
 {
     public class RemoteClient: SocketConnection
     {

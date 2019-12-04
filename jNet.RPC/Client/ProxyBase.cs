@@ -11,7 +11,7 @@ using System.Runtime.Serialization;
 using System.Threading;
 using Newtonsoft.Json;
 
-namespace ComponentModelRPC.Client
+namespace jNet.RPC.Client
 {
     [JsonObject(IsReference = true, MemberSerialization = MemberSerialization.OptIn)]
     public abstract class ProxyBase : IDto

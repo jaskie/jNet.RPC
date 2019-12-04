@@ -3,7 +3,7 @@ using System.Drawing;
 using System.IO;
 using Newtonsoft.Json;
 
-namespace ComponentModelRPC
+namespace jNet.RPC
 {
     public class BitmapJsonConverter : JsonConverter
     {
