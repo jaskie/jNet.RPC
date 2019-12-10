@@ -32,8 +32,7 @@ namespace jNet.RPC.Client
             Finalized?.Invoke(this, EventArgs.Empty);
         }
 
-        [JsonProperty]
-        public Guid DtoGuid { get; set; }
+        public Guid DtoGuid { get; internal set; }
 
         public event PropertyChangedEventHandler PropertyChanged;
 

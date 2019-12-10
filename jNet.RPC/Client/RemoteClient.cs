@@ -204,13 +204,13 @@ namespace jNet.RPC.Client
         {
             try
             {
-            using (var valueStream = message.ValueStream)
-            {
-                if (valueStream == null)
-                    return default(T);
-                using (var reader = new StreamReader(valueStream))
-                    return (T)Serializer.Deserialize(reader, typeof(T));
-            }
+                using (var valueStream = message.ValueStream)
+                {
+                    if (valueStream == null)
+                        return default(T);
+                    using (var reader = new StreamReader(valueStream))
+                        return (T) Serializer.Deserialize(reader, typeof(T));
+                }
             }
             catch (UnresolvedReferenceException e)
             {
