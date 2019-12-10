@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace jNet.RPC
+namespace jNet.RPC.Server
 {
     public class UnresolvedReferenceException: Exception
     {

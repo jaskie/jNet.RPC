@@ -72,7 +72,7 @@ namespace jNet.RPC.Client
             lock (((IDictionary) _knownDtos).SyncRoot)
             {
                 if (!_knownDtos.TryGetValue(id, out var value))
-                    throw new UnresolvedReferenceException(id);
+                    return UnreferencedObjectFinder(id);
                 Logger.Trace("Resolved reference {0} with {1}", reference, value);
                 if (value.TryGetTarget(out var target))
                     return target;
@@ -84,6 +84,8 @@ namespace jNet.RPC.Client
         #endregion //IReferenceResolver
 
         internal event EventHandler<ProxyBaseEventArgs> ReferenceFinalized;
+
+        internal Func<Guid, ProxyBase> UnreferencedObjectFinder;
 
         internal ProxyBase ResolveReference(Guid reference)
         {

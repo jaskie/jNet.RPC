@@ -4,7 +4,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using Newtonsoft.Json.Serialization;
 
@@ -21,6 +20,7 @@ namespace jNet.RPC.Client
         public RemoteClient(string address): base(address, new ClientReferenceResolver())
         {
             ((ClientReferenceResolver)ReferenceResolver).ReferenceFinalized += Resolver_ReferenceFinalized;
+            ((ClientReferenceResolver)ReferenceResolver).UnreferencedObjectFinder = UnreferencedObjectFinder;
             StartThreads();
         }
 
@@ -60,11 +60,6 @@ namespace jNet.RPC.Client
                     new SocketMessageArrayValue { Value = parameters });
                 return SendAndGetResponse<T>(queryMessage);
             }
-            catch (UnresolvedReferenceException unresolved)
-            {
-                ProcessUnresolvedReference(dto, unresolved);
-                return default(T);
-            }
             catch (Exception e)
             {
                 Logger.Error("From Query for {0}: {1}", dto, e);
@@ -84,11 +79,6 @@ namespace jNet.RPC.Client
                     null
                 );
                 return SendAndGetResponse<T>(queryMessage);
-            }
-            catch (UnresolvedReferenceException unresolved)
-            {
-                ProcessUnresolvedReference(dto, unresolved);
-                return default(T);
             }
             catch (Exception e)
             {
@@ -202,35 +192,25 @@ namespace jNet.RPC.Client
 
         private T Deserialize<T>(SocketMessage message)
         {
-            try
+            using (var valueStream = message.ValueStream)
             {
-                using (var valueStream = message.ValueStream)
-                {
-                    if (valueStream == null)
-                        return default(T);
-                    using (var reader = new StreamReader(valueStream))
-                        return (T) Serializer.Deserialize(reader, typeof(T));
-                }
-            }
-            catch (UnresolvedReferenceException e)
-            {
-                var t = AskForUnresolvedObject(e.Guid);
-                return Deserialize<T>(message);
+                if (valueStream == null)
+                    return default(T);
+                using (var reader = new StreamReader(valueStream))
+                    return (T) Serializer.Deserialize(reader, typeof(T));
             }
         }
 
-        IDto AskForUnresolvedObject(Guid unresolvedGuid)
+        private ProxyBase UnreferencedObjectFinder(Guid guid)
         {
-            return SendAndGetResponse<IDto>(new SocketMessage((object) null)
+            var proxy =  SendAndGetResponse<ProxyBase>(new SocketMessage((object)null)
             {
                 MessageType = SocketMessage.SocketMessageType.UnresolvedReference,
-                DtoGuid = unresolvedGuid
+                DtoGuid = guid
             });
+            Logger.Trace("Unresolved reference {0} was restored: {1}", guid, proxy);
+            return proxy;
         }
-
-        private void ProcessUnresolvedReference(ProxyBase dto, UnresolvedReferenceException unresolved, [CallerMemberName] string method = null)
-        {
-            Logger.Error("From {0} {1}: {2}", method, dto, unresolved);
-        }
+        
     }
 }
