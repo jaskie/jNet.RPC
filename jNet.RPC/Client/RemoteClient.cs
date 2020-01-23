@@ -27,11 +27,7 @@ namespace jNet.RPC.Client
         {
             ((ClientReferenceResolver)ReferenceResolver).ReferenceFinalized += Resolver_ReferenceFinalized;
             ((ClientReferenceResolver)ReferenceResolver).UnreferencedObjectFinder = UnreferencedObjectFinder;
-<<<<<<< HEAD
             StartThreads();           
-=======
-            StartThreads();
->>>>>>> 9536912ffdffd1251ba38664caafec2497855ae9
         }
 
         protected override void OnDispose()
@@ -68,11 +64,7 @@ namespace jNet.RPC.Client
                     methodName,
                     parameters.Length,
                     new SocketMessageArrayValue { Value = parameters });
-<<<<<<< HEAD
                 return SendAndGetResponse<T>(queryMessage).Result;
-=======
-                return SendAndGetResponse<T>(queryMessage);
->>>>>>> 9536912ffdffd1251ba38664caafec2497855ae9
             }
             catch (Exception e)
             {
@@ -92,11 +84,7 @@ namespace jNet.RPC.Client
                     0,
                     null
                 );
-<<<<<<< HEAD
                 return SendAndGetResponse<T>(queryMessage).Result;
-=======
-                return SendAndGetResponse<T>(queryMessage);
->>>>>>> 9536912ffdffd1251ba38664caafec2497855ae9
             }
             catch (Exception e)
             {
@@ -247,17 +235,12 @@ namespace jNet.RPC.Client
                 if (valueStream == null)
                     return default(T);
                 using (var reader = new StreamReader(valueStream))
-<<<<<<< HEAD
                     return (T)Serializer.Deserialize(reader, typeof(T));
-=======
-                    return (T) Serializer.Deserialize(reader, typeof(T));
->>>>>>> 9536912ffdffd1251ba38664caafec2497855ae9
             }
         }
 
         private ProxyBase UnreferencedObjectFinder(Guid guid)
         {
-<<<<<<< HEAD
             Logger.Debug($"Unresolved reference! {guid}");
             var proxy = SendAndGetResponse<ProxyBase>(new SocketMessage((object)null)
             {
@@ -268,16 +251,5 @@ namespace jNet.RPC.Client
             Logger.Trace("Unresolved reference {0} was restored: {1}", guid, proxy);
             return proxy;
         }       
-=======
-            var proxy =  SendAndGetResponse<ProxyBase>(new SocketMessage((object)null)
-            {
-                MessageType = SocketMessage.SocketMessageType.UnresolvedReference,
-                DtoGuid = guid
-            });
-            Logger.Trace("Unresolved reference {0} was restored: {1}", guid, proxy);
-            return proxy;
-        }
-        
->>>>>>> 9536912ffdffd1251ba38664caafec2497855ae9
     }
 }

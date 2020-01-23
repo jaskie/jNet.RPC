@@ -62,6 +62,7 @@ namespace jNet.RPC.Client
                     return true;
                 _knownDtos.TryRemove(dto.DtoGuid, out _);
             }
+
             return false;
         }
 
