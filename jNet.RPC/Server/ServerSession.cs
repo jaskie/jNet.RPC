@@ -11,6 +11,7 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Security.Principal;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace jNet.RPC.Server
 {
@@ -21,6 +22,7 @@ namespace jNet.RPC.Server
         private readonly IDto _initialObject;
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
+        private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();               
 
         public ServerSession(TcpClient client, IDto initialObject, IPrincipalProvider principalProvider): base(client, new ServerReferenceResolver())
         {
@@ -32,7 +34,7 @@ namespace jNet.RPC.Server
             if (_sessionUser == null)
                 throw new UnauthorizedAccessException($"Client {Client.Client.RemoteEndPoint} not allowed");
             ((ServerReferenceResolver)ReferenceResolver).ReferencePropertyChanged += ReferenceResolver_ReferencePropertyChanged;
-            StartThreads();
+            StartThreads();           
         }
 
 #if DEBUG
@@ -55,126 +57,159 @@ namespace jNet.RPC.Server
         }
 
 
-        protected override void OnMessage(SocketMessage message)
+        protected override async Task MessageHandlerProc()
         {
-            try
+            Thread.CurrentPrincipal = _sessionUser;
+
+            while (!_cancellationTokenSource.IsCancellationRequested)
             {
-                if (message.MessageType == SocketMessage.SocketMessageType.RootQuery)
+                if (_receiveQueue.IsEmpty)
+                    await _messageHandlerSempahore.WaitAsync();
+
+                if (_cancellationTokenSource.IsCancellationRequested)
+                    break;
+
+                if (!_receiveQueue.TryDequeue(out var message))
                 {
-                    SendResponse(message, _initialObject);
+                    await Task.Delay(5);
+                    continue;
                 }
-                else if (message.MessageType == SocketMessage.SocketMessageType.UnresolvedReference)
+                    
+                try
                 {
-                    SendResponse(message, DtoBase.FindDto(message.DtoGuid));
-                }
-                else // method of particular object
-                {
-                    var objectToInvoke = ((ServerReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
-                    if (objectToInvoke != null)
+                    if (message.MessageType == SocketMessage.SocketMessageType.RootQuery)
                     {
-                        Debug.WriteLine($"{objectToInvoke}:{message.MemberName}");
-                        switch (message.MessageType)
+                        SendResponse(message, _initialObject);
+                    }
+                    else if (message.MessageType == SocketMessage.SocketMessageType.UnresolvedReference)
+                    {
+                        var dto = DtoBase.FindDto(message.DtoGuid);
+                        if (dto == null)
                         {
-                            case SocketMessage.SocketMessageType.Query:
-                            case SocketMessage.SocketMessageType.Invoke:
-                                var objectToInvokeType = objectToInvoke.GetType();
-                                var methodToInvoke = objectToInvokeType.GetMethods()
-                                    .FirstOrDefault(m => m.Name == message.MemberName &&
-                                                         m.GetParameters().Length == message.ParametersCount);
-                                if (methodToInvoke != null)
-                                {
-                                    var parameters = DeserializeDto<SocketMessageArrayValue>(message.ValueStream);
-                                    var methodParameters = methodToInvoke.GetParameters();
-                                    for (var i = 0; i < methodParameters.Length; i++)
-                                        MethodParametersAlignment.AlignType(ref parameters.Value[i],
-                                            methodParameters[i].ParameterType);
-                                    object response;
-                                    try
+                            var endMessage = new SocketMessage(message, null);
+                            endMessage.MessageType = SocketMessage.SocketMessageType.UnresolvedReferenceServer;
+                            SendResponse(endMessage, null);
+                        }
+
+                        ((ServerReferenceResolver)ReferenceResolver).RemoveReference(dto);
+                        SendResponse(message, dto);
+                    }
+                    else // method of particular object
+                    {
+                        var objectToInvoke = ((ServerReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
+                        if (objectToInvoke != null)
+                        {
+                            Debug.WriteLine($"{objectToInvoke}:{message.MemberName}");
+                            switch (message.MessageType)
+                            {
+                                case SocketMessage.SocketMessageType.Query:
+                                case SocketMessage.SocketMessageType.Invoke:
+                                    var objectToInvokeType = objectToInvoke.GetType();
+                                    var methodToInvoke = objectToInvokeType.GetMethods()
+                                        .FirstOrDefault(m => m.Name == message.MemberName &&
+                                                             m.GetParameters().Length == message.ParametersCount);
+                                    if (methodToInvoke != null)
                                     {
-                                        response = methodToInvoke.Invoke(objectToInvoke, parameters.Value);
+                                        var parameters = DeserializeDto<SocketMessageArrayValue>(message.ValueStream);
+                                        var methodParameters = methodToInvoke.GetParameters();
+                                        for (var i = 0; i < methodParameters.Length; i++)
+                                            MethodParametersAlignment.AlignType(ref parameters.Value[i],
+                                                methodParameters[i].ParameterType);
+                                        object response;
+                                        try
+                                        {
+                                            response = methodToInvoke.Invoke(objectToInvoke, parameters.Value);
+                                        }
+                                        catch (Exception e)
+                                        {
+                                            SendException(message, e);
+                                            throw;
+                                        }
+                                        if (message.MessageType == SocketMessage.SocketMessageType.Query)
+                                            SendResponse(message, response);
                                     }
-                                    catch (Exception e)
+                                    else
+                                        throw new ApplicationException(
+                                            $"Server: unknown method: {objectToInvoke}:{message.MemberName}");
+                                    break;
+                                case SocketMessage.SocketMessageType.Get:
+                                    var getProperty = objectToInvoke.GetType().GetProperty(message.MemberName);
+                                    if (getProperty != null)
                                     {
-                                        SendException(message, e);
-                                        throw;
-                                    }
-                                    if (message.MessageType == SocketMessage.SocketMessageType.Query)
+                                        object response;
+                                        try
+                                        {
+                                            response = getProperty.GetValue(objectToInvoke, null);
+                                        }
+                                        catch (Exception e)
+                                        {
+                                            SendException(message, e);
+                                            throw;
+                                        }
                                         SendResponse(message, response);
-                                }
-                                else
-                                    throw new ApplicationException(
-                                        $"Server: unknown method: {objectToInvoke}:{message.MemberName}");
-                                break;
-                            case SocketMessage.SocketMessageType.Get:
-                                var getProperty = objectToInvoke.GetType().GetProperty(message.MemberName);
-                                if (getProperty != null)
-                                {
-                                    object response;
-                                    try
-                                    {
-                                        response = getProperty.GetValue(objectToInvoke, null);
                                     }
-                                    catch (Exception e)
+                                    else
+                                        throw new ApplicationException(
+                                            $"Server: unknown property: {objectToInvoke}:{message.MemberName}");
+                                    break;
+                                case SocketMessage.SocketMessageType.Set:
+                                    var setProperty = objectToInvoke.GetType().GetProperty(message.MemberName);
+                                    if (setProperty != null)
                                     {
-                                        SendException(message, e);
-                                        throw;
+                                        var parameter = DeserializeDto<object>(message.ValueStream);
+                                        MethodParametersAlignment.AlignType(ref parameter, setProperty.PropertyType);
+                                        try
+                                        {
+                                            setProperty.SetValue(objectToInvoke, parameter, null);
+                                        }
+                                        catch (Exception e)
+                                        {
+                                            SendException(message, e);
+                                            throw;
+                                        }
                                     }
-                                    SendResponse(message, response);
-                                }
-                                else
-                                    throw new ApplicationException(
-                                        $"Server: unknown property: {objectToInvoke}:{message.MemberName}");
-                                break;
-                            case SocketMessage.SocketMessageType.Set:
-                                var setProperty = objectToInvoke.GetType().GetProperty(message.MemberName);
-                                if (setProperty != null)
-                                {
-                                    var parameter = DeserializeDto<object>(message.ValueStream);
-                                    MethodParametersAlignment.AlignType(ref parameter, setProperty.PropertyType);
-                                    try
+                                    else
+                                        throw new ApplicationException(
+                                            $"Server: unknown property: {objectToInvoke}:{message.MemberName}");
+                                    break;
+                                case SocketMessage.SocketMessageType.EventAdd:
+                                case SocketMessage.SocketMessageType.EventRemove:
+                                    var ei = objectToInvoke.GetType().GetEvent(message.MemberName);
+                                    if (ei != null)
                                     {
-                                        setProperty.SetValue(objectToInvoke, parameter, null);
+                                        if (message.MessageType == SocketMessage.SocketMessageType.EventAdd)
+                                            AddDelegate(objectToInvoke, ei);
+                                        else if (message.MessageType == SocketMessage.SocketMessageType.EventRemove)
+                                            RemoveDelegate(objectToInvoke, ei);
                                     }
-                                    catch (Exception e)
-                                    {
-                                        SendException(message, e);
-                                        throw;
-                                    }
-                                }
-                                else
-                                    throw new ApplicationException(
-                                        $"Server: unknown property: {objectToInvoke}:{message.MemberName}");
-                                break;
-                            case SocketMessage.SocketMessageType.EventAdd:
-                            case SocketMessage.SocketMessageType.EventRemove:
-                                var ei = objectToInvoke.GetType().GetEvent(message.MemberName);
-                                if (ei != null)
-                                {
-                                    if (message.MessageType == SocketMessage.SocketMessageType.EventAdd)
-                                        AddDelegate(objectToInvoke, ei);
-                                    else if (message.MessageType == SocketMessage.SocketMessageType.EventRemove)
-                                        RemoveDelegate(objectToInvoke, ei);
-                                }
-                                else
-                                    throw new ApplicationException(
-                                        $"Server: unknown event: {objectToInvoke}:{message.MemberName}");
-                                break;
-                            case SocketMessage.SocketMessageType.ProxyFinalized:
-                                RemoveReference(objectToInvoke);
-                                break;
+                                    else
+                                        throw new ApplicationException(
+                                            $"Server: unknown event: {objectToInvoke}:{message.MemberName}");
+                                    break;
+                                case SocketMessage.SocketMessageType.ProxyFinalized:
+                                    RemoveReference(objectToInvoke);
+                                    break;
+                            }
+                        }
+                        else
+                        {
+                            var endMessage = new SocketMessage(message, null);
+                            endMessage.MessageType = SocketMessage.SocketMessageType.UnresolvedReferenceServer;
+                            SendResponse(endMessage, null);
+                            Debug.WriteLine($"Server: unknown DTO: {message.DtoGuid} on {message}");
                         }
                     }
-                    else
-                    {
-                        SendResponse(message, null);
-                        throw new ApplicationException($"Server: unknown DTO: {message.DtoGuid} on {message}");
-                    }
+                }
+                catch (Exception ex)
+                {
+                    _receiveQueue.Enqueue(message);                    
+                    await Task.Delay(50);
+
+                    Debug.WriteLine($"Exception while handling message. {ex.Message}");
+                    Logger.Error(ex);
                 }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex);
-            }
+            
         }
 
         
@@ -203,7 +238,7 @@ namespace jNet.RPC.Server
         }
 
         private void SendResponse(SocketMessage message, object response)
-        {
+        {            
             Send(new SocketMessage(message, response));
         }
 
@@ -268,7 +303,6 @@ namespace jNet.RPC.Server
                         MessageType = SocketMessage.SocketMessageType.EventNotification,
                         DtoGuid = dto.DtoGuid,
                         MemberName = eventName,
-
                     });
                 }
                 else

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
@@ -9,7 +10,7 @@ namespace jNet.RPC.Client
 {
     internal class ClientReferenceResolver : IReferenceResolver, IDisposable
     {
-        private readonly Dictionary<Guid, WeakReference<ProxyBase>> _knownDtos = new Dictionary<Guid, WeakReference<ProxyBase>>();
+        private readonly ConcurrentDictionary<Guid, WeakReference<ProxyBase>> _knownDtos = new ConcurrentDictionary<Guid, WeakReference<ProxyBase>>();
         private int _disposed;
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
@@ -17,10 +18,8 @@ namespace jNet.RPC.Client
         {
             if (Interlocked.Exchange(ref _disposed, 1) != default(int))
                 return;
-            lock (((IDictionary) _knownDtos).SyncRoot)
-            {
-                _knownDtos.Clear();
-            }
+
+            _knownDtos.Clear();
         }
 
         #region IReferenceResolver
@@ -30,8 +29,9 @@ namespace jNet.RPC.Client
                 return;
             var id = new Guid(reference);
             proxy.DtoGuid = id;
-            lock (((IDictionary)_knownDtos).SyncRoot)
-                _knownDtos[id] = new WeakReference<ProxyBase>(proxy);
+            if (!_knownDtos.TryAdd(id, new WeakReference<ProxyBase>(proxy)))
+                Logger.Warn($"Reference {id} already exists in knownDtos.");
+            
             proxy.Finalized += Proxy_Finalized;
             Logger.Trace("AddReference {0} for {1}", reference, value);
         }
@@ -40,12 +40,11 @@ namespace jNet.RPC.Client
         {
             if (!(value is ProxyBase proxy)) return
                 string.Empty;
-            lock (((IDictionary)_knownDtos).SyncRoot)
-            {
-                if (IsReferenced(context, value))
-                    return proxy.DtoGuid.ToString();
-                _knownDtos[proxy.DtoGuid] = new WeakReference<ProxyBase>(proxy);
-            }
+
+            if (IsReferenced(context, value))
+                return proxy.DtoGuid.ToString();
+            _knownDtos[proxy.DtoGuid] = new WeakReference<ProxyBase>(proxy);
+
             proxy.Finalized += Proxy_Finalized;
             Logger.Warn("GetReference added {0} for {1}", proxy.DtoGuid, value);
             return proxy.DtoGuid.ToString();
@@ -56,46 +55,45 @@ namespace jNet.RPC.Client
         {
             if (!(value is IDto dto))
                 return false;
-            lock (((IDictionary) _knownDtos).SyncRoot)
-                if (_knownDtos.TryGetValue(dto.DtoGuid, out var reference))
-                {
-                    if (reference.TryGetTarget(out var _))
-                        return true;
-                    _knownDtos.Remove(dto.DtoGuid);
-                }
+
+            if (_knownDtos.TryGetValue(dto.DtoGuid, out var reference))
+            {
+                if (reference.TryGetTarget(out _))
+                    return true;
+                _knownDtos.TryRemove(dto.DtoGuid, out _);
+            }
             return false;
         }
 
         public object ResolveReference(object context, string reference)
         {
             var id = new Guid(reference);
-            lock (((IDictionary) _knownDtos).SyncRoot)
-            {
-                if (!_knownDtos.TryGetValue(id, out var value))
-                    throw new UnresolvedReferenceException(id);
-                Logger.Trace("Resolved reference {0} with {1}", reference, value);
-                if (value.TryGetTarget(out var target))
-                    return target;
-                _knownDtos.Remove(id);
-                return null;
-            }
+
+            if (!_knownDtos.TryGetValue(id, out var value))
+                return UnreferencedObjectFinder(id);
+
+            Logger.Trace("Resolved reference {0} with {1}", reference, value);
+            if (value.TryGetTarget(out var target))
+                return target;
+
+            _knownDtos.TryRemove(id, out _);
+            return null;
+
         }
 
         #endregion //IReferenceResolver
 
         internal event EventHandler<ProxyBaseEventArgs> ReferenceFinalized;
+        internal Func<Guid, ProxyBase> UnreferencedObjectFinder;
 
         internal ProxyBase ResolveReference(Guid reference)
         {
-            lock (((IDictionary) _knownDtos).SyncRoot)
-            {
-                if (!_knownDtos.TryGetValue(reference, out var p))
-                    return null;
-                if (p.TryGetTarget(out var target))
-                    return target;
-                _knownDtos.Remove(reference);
-                return null;
-            }
+            if (!_knownDtos.TryGetValue(reference, out var p))
+                return UnreferencedObjectFinder(reference);
+            if (p.TryGetTarget(out var target))
+                return target;
+            _knownDtos.TryRemove(reference, out _);
+            return null;
         }
 
         private void Proxy_Finalized(object sender, EventArgs e)
@@ -104,13 +102,11 @@ namespace jNet.RPC.Client
             ((ProxyBase)sender).Finalized -= Proxy_Finalized;
             try
             {
-                lock (((IDictionary) _knownDtos).SyncRoot)
-                    if (_knownDtos.TryGetValue(((ProxyBase) sender).DtoGuid, out var _))
-                    {
-                        _knownDtos.Remove(((ProxyBase) sender).DtoGuid);
-                        Logger.Trace("Reference resolver - object {0} disposed, generation is {1}", sender,
-                            GC.GetGeneration(sender));
-                    }
+                if (_knownDtos.TryRemove(((ProxyBase)sender).DtoGuid, out _))
+                {
+                    Logger.Trace("Reference resolver - object {0} disposed, generation is {1}", sender,
+                        GC.GetGeneration(sender));
+                }
                 ReferenceFinalized?.Invoke(this, new ProxyBaseEventArgs((ProxyBase) sender));
             }
             catch

@@ -2,10 +2,13 @@
 
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
 using Newtonsoft.Json.Serialization;
 
 namespace jNet.RPC.Client
@@ -14,14 +17,18 @@ namespace jNet.RPC.Client
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private object _initialObject;
-        private readonly Dictionary<Guid, SocketMessage> _receivedMessages = new Dictionary<Guid, SocketMessage>();
-        private readonly AutoResetEvent _messageReceivedAutoResetEvent = new AutoResetEvent(false);
+        private readonly ConcurrentDictionary<Guid, SocketMessage> _receivedMessages = new ConcurrentDictionary<Guid, SocketMessage>();
 
+        private readonly SemaphoreSlim _sendAndResponseSemaphore = new SemaphoreSlim(0); 
+        private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
+        private int _requestsCount = 0;
+        private object _requestsLock = new object();
 
         public RemoteClient(string address): base(address, new ClientReferenceResolver())
         {
             ((ClientReferenceResolver)ReferenceResolver).ReferenceFinalized += Resolver_ReferenceFinalized;
-            StartThreads();
+            ((ClientReferenceResolver)ReferenceResolver).UnreferencedObjectFinder = UnreferencedObjectFinder;
+            StartThreads();           
         }
 
         protected override void OnDispose()
@@ -37,7 +44,7 @@ namespace jNet.RPC.Client
             try
             {
                 var queryMessage = WebSocketMessageCreate(SocketMessage.SocketMessageType.RootQuery, null, null, 0, null);
-                var response = SendAndGetResponse<T>(queryMessage);
+                var response = SendAndGetResponse<T>(queryMessage).Result;
                 _initialObject = response;
                 return response;
             }
@@ -58,12 +65,7 @@ namespace jNet.RPC.Client
                     methodName,
                     parameters.Length,
                     new SocketMessageArrayValue { Value = parameters });
-                return SendAndGetResponse<T>(queryMessage);
-            }
-            catch (UnresolvedReferenceException unresolved)
-            {
-                ProcessUnresolvedReference(dto, unresolved);
-                return default(T);
+                return SendAndGetResponse<T>(queryMessage).Result;
             }
             catch (Exception e)
             {
@@ -83,12 +85,7 @@ namespace jNet.RPC.Client
                     0,
                     null
                 );
-                return SendAndGetResponse<T>(queryMessage);
-            }
-            catch (UnresolvedReferenceException unresolved)
-            {
-                ProcessUnresolvedReference(dto, unresolved);
-                return default(T);
+                return SendAndGetResponse<T>(queryMessage).Result;
             }
             catch (Exception e)
             {
@@ -137,24 +134,48 @@ namespace jNet.RPC.Client
                 null));
         }
 
-        protected override void OnMessage(SocketMessage message)
+        protected override async Task MessageHandlerProc()
         {
-            if (message.MessageType != SocketMessage.SocketMessageType.RootQuery && _initialObject == null)
-                return;
-            switch (message.MessageType)
+            while (!_cancellationTokenSource.IsCancellationRequested)
             {
-                case SocketMessage.SocketMessageType.EventNotification:
-                    var notifyObject = ((ClientReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
-                    notifyObject?.OnEventNotificationMessage(message);
+                if (_receiveQueue.IsEmpty)
+                    await _messageHandlerSempahore.WaitAsync();
+
+                if (_cancellationTokenSource.IsCancellationRequested)
                     break;
-                default:
-                    lock (((IDictionary)_receivedMessages).SyncRoot)
-                    {
-                        _receivedMessages[message.MessageGuid] = message;
-                        _messageReceivedAutoResetEvent.Set();
-                    }
-                    break;
+
+                if (!_receiveQueue.TryDequeue(out var message))
+                {
+                    await Task.Delay(5);
+                    continue;
+                }
+
+                if (message.MessageType != SocketMessage.SocketMessageType.RootQuery && _initialObject == null)
+                {
+                    _receiveQueue.Enqueue(message);
+                    continue;
+                }
+                    
+
+                switch (message.MessageType)
+                {                   
+                    case SocketMessage.SocketMessageType.EventNotification:
+                        _ = Task.Run(() => 
+                        {
+                            var notifyObject = ((ClientReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
+                            notifyObject?.OnEventNotificationMessage(message);
+                        });                        
+                        break;
+                    default:
+                        _receivedMessages[message.MessageGuid] = message;                        
+
+                        if (_requestsCount>0)
+                            lock (_requestsLock)
+                                _sendAndResponseSemaphore.Release(_requestsCount);
+                        break;
+                }
             }
+                
         }
 
         private SocketMessage WebSocketMessageCreate(SocketMessage.SocketMessageType socketMessageType, IDto dto, string memberName, int paramsCount, object value)
@@ -168,22 +189,30 @@ namespace jNet.RPC.Client
             };
         }
 
-        private T SendAndGetResponse<T>(SocketMessage query)
+        private async Task<T> SendAndGetResponse<T>(SocketMessage query)
         {
+            lock (_requestsLock)
+                ++_requestsCount;
             Send(query);
             while (IsConnected)
             {
-                _messageReceivedAutoResetEvent.WaitOne(5);
+                await _sendAndResponseSemaphore.WaitAsync().ConfigureAwait(false);
                 SocketMessage response;
-                lock (((IDictionary) _receivedMessages).SyncRoot)
-                {
-                    if (_receivedMessages.TryGetValue(query.MessageGuid, out response))
-                        _receivedMessages.Remove(query.MessageGuid);
-                }
-                if (response == null)
-                    continue;
+
+                if (!_receivedMessages.TryRemove(query.MessageGuid, out response))
+                    continue;                
+
+                lock (_requestsLock)
+                    --_requestsCount;
+
+                //Logger.Debug($"SAGR client satisified: {response.MessageGuid}");
+
+                if (response.MessageType == SocketMessage.SocketMessageType.UnresolvedReferenceServer)
+                    return default(T);
+
                 if (response.MessageType == SocketMessage.SocketMessageType.Exception)
                     throw Deserialize<Exception>(response);
+
                 var result = Deserialize<T>(response);
                 return result;
             }
@@ -202,8 +231,6 @@ namespace jNet.RPC.Client
 
         private T Deserialize<T>(SocketMessage message)
         {
-            try
-            {
             using (var valueStream = message.ValueStream)
             {
                 if (valueStream == null)
@@ -211,26 +238,19 @@ namespace jNet.RPC.Client
                 using (var reader = new StreamReader(valueStream))
                     return (T)Serializer.Deserialize(reader, typeof(T));
             }
-            }
-            catch (UnresolvedReferenceException e)
-            {
-                var t = AskForUnresolvedObject(e.Guid);
-                return Deserialize<T>(message);
-            }
         }
 
-        IDto AskForUnresolvedObject(Guid unresolvedGuid)
+        private ProxyBase UnreferencedObjectFinder(Guid guid)
         {
-            return SendAndGetResponse<IDto>(new SocketMessage((object) null)
+            Logger.Debug($"Unresolved reference! {guid}");
+            var proxy = SendAndGetResponse<ProxyBase>(new SocketMessage((object)null)
             {
                 MessageType = SocketMessage.SocketMessageType.UnresolvedReference,
-                DtoGuid = unresolvedGuid
-            });
-        }
-
-        private void ProcessUnresolvedReference(ProxyBase dto, UnresolvedReferenceException unresolved, [CallerMemberName] string method = null)
-        {
-            Logger.Error("From {0} {1}: {2}", method, dto, unresolved);
-        }
+                DtoGuid = guid
+            }).Result;
+            Logger.Debug($"Unresolved reference restored: {guid}");
+            Logger.Trace("Unresolved reference {0} was restored: {1}", guid, proxy);
+            return proxy;
+        }       
     }
 }

@@ -72,8 +72,10 @@ namespace jNet.RPC.Server
 
         public DtoBase ResolveReference(Guid reference)
         {
-            if (!_knownDtos.TryGetValue(reference, out var p))
-                throw new UnresolvedReferenceException(reference);
+            if (!_knownDtos.TryGetValue(reference, out var p))            
+                return DtoBase.FindDto(reference);                             
+                                        
+                //throw new UnresolvedReferenceException(reference);                
             return p;
         }
 
