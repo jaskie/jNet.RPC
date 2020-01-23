@@ -79,7 +79,7 @@
     <Compile Include="Server\DtoBase.cs" />
     <Compile Include="SocketMessage.cs" />
     <Compile Include="SocketConnection.cs" />
-    <Compile Include="UnresolvedReferenceException.cs" />
+    <Compile Include="Server\UnresolvedReferenceException.cs" />
     <Compile Include="WrappedEventArgs.cs" />
   </ItemGroup>
   <ItemGroup>

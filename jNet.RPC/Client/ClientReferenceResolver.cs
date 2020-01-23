@@ -78,13 +78,12 @@ namespace jNet.RPC.Client
 
             _knownDtos.TryRemove(id, out _);
             return null;
-
         }
 
         #endregion //IReferenceResolver
 
         internal event EventHandler<ProxyBaseEventArgs> ReferenceFinalized;
-        internal Func<Guid, ProxyBase> UnreferencedObjectFinder;
+        internal Func<Guid, ProxyBase> UnreferencedObjectFinder;       
 
         internal ProxyBase ResolveReference(Guid reference)
         {

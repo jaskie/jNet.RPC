@@ -232,6 +232,7 @@ namespace jNet.RPC
         {
             if (!IsConnected)
                 return;
+            IsConnected = false;
             Disconnected?.Invoke(this, EventArgs.Empty);
             Debug.WriteLine("Disconnected");
         }        
