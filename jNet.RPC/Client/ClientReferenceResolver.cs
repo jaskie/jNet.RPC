@@ -56,12 +56,10 @@ namespace jNet.RPC.Client
             if (!(value is IDto dto))
                 return false;
 
-            if (_knownDtos.TryGetValue(dto.DtoGuid, out var reference))
-            {
+            if (_knownDtos.TryRemove(dto.DtoGuid, out var reference))            
                 if (reference.TryGetTarget(out _))
-                    return true;
-                _knownDtos.TryRemove(dto.DtoGuid, out _);
-            }
+                    return true;                
+            
             return false;
         }
 
