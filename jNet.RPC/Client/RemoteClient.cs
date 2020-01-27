@@ -33,6 +33,7 @@ namespace jNet.RPC.Client
         protected override void OnDispose()
         {
             base.OnDispose();
+            _cancellationTokenSource.Cancel();
             ((ClientReferenceResolver)ReferenceResolver).Dispose();
         }
         
@@ -137,17 +138,25 @@ namespace jNet.RPC.Client
         {
             while (!_cancellationTokenSource.IsCancellationRequested)
             {
-                if (_receiveQueue.IsEmpty)
-                    await _messageHandlerSempahore.WaitAsync();
+                if (!_receiveQueue.TryDequeue(out var message))
+                {
+                    try
+                    {
+                        await _messageHandlerSempahore.WaitAsync(_cancellationTokenSource.Token);
+                    }
+                    catch (Exception ex)
+                    {
+                        if (ex.GetType() == typeof(OperationCanceledException))
+                            break;
+
+                        Logger.Error(ex, "Unexpected error in MessageHandler");
+                    }
+                    continue;
+                }
 
                 if (_cancellationTokenSource.IsCancellationRequested)
                     break;
-
-                if (!_receiveQueue.TryDequeue(out var message))
-                {
-                    await Task.Delay(5);
-                    continue;
-                }
+               
 
                 if (message.MessageType != SocketMessage.SocketMessageType.RootQuery && _initialObject == null)
                 {
@@ -161,15 +170,16 @@ namespace jNet.RPC.Client
                     case SocketMessage.SocketMessageType.EventNotification:
                         _ = Task.Run(() => 
                         {
-                            var notifyObject = ((ClientReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
+                            var notifyObject = ((ClientReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid).Result;
                             notifyObject?.OnEventNotificationMessage(message);
-                        });                        
+                        });
+                        
                         break;
                     default:
-                        _receivedMessages[message.MessageGuid] = message;                        
+                        _receivedMessages[message.MessageGuid] = message;
 
-                        if (_requestsCount>0)
-                            lock (_requestsLock)
+                        lock (_requestsLock)
+                            if (_requestsCount>0)                            
                                 _sendAndResponseSemaphore.Release(_requestsCount);
                         break;
                 }
@@ -195,7 +205,18 @@ namespace jNet.RPC.Client
             Send(query);
             while (IsConnected)
             {
-                await _sendAndResponseSemaphore.WaitAsync().ConfigureAwait(false);
+                try
+                {
+                    await _sendAndResponseSemaphore.WaitAsync(_cancellationTokenSource.Token).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    if (ex.GetType() == typeof(OperationCanceledException))
+                        break;
+
+                    Logger.Error(ex, "Unexpected error in SendAndGetResponseProc");
+                }
+
                 SocketMessage response;
 
                 if (!_receivedMessages.TryRemove(query.MessageGuid, out response))
@@ -239,16 +260,16 @@ namespace jNet.RPC.Client
             }
         }
 
-        private ProxyBase UnreferencedObjectFinder(Guid guid)
+        private async Task<ProxyBase> UnreferencedObjectFinder(Guid guid)
         {
-            Logger.Debug($"Unresolved reference! {guid}");
-            var proxy = SendAndGetResponse<ProxyBase>(new SocketMessage((object)null)
+            //Logger.Debug($"Unresolved reference! {guid}");
+            var proxy = await SendAndGetResponse<ProxyBase>(new SocketMessage((object)null)
             {
                 MessageType = SocketMessage.SocketMessageType.UnresolvedReference,
                 DtoGuid = guid
-            }).Result;
-            Logger.Debug($"Unresolved reference restored: {guid}");
-            Logger.Trace("Unresolved reference {0} was restored: {1}", guid, proxy);
+            }).ConfigureAwait(false);
+
+            //Logger.Debug($"Unresolved reference restored: {guid} : {proxy}");          
             return proxy;
         }       
     }

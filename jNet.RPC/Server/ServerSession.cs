@@ -63,17 +63,24 @@ namespace jNet.RPC.Server
 
             while (!_cancellationTokenSource.IsCancellationRequested)
             {
-                if (_receiveQueue.IsEmpty)
-                    await _messageHandlerSempahore.WaitAsync();
-
-                if (_cancellationTokenSource.IsCancellationRequested)
-                    break;
-
                 if (!_receiveQueue.TryDequeue(out var message))
                 {
-                    await Task.Delay(5);
+                    try
+                    {
+                        await _messageHandlerSempahore.WaitAsync(_cancellationTokenSource.Token);
+                    }
+                    catch (Exception ex)
+                    {
+                        if (ex.GetType() == typeof(OperationCanceledException))
+                            break;
+
+                        Logger.Error(ex, "Unexpected error in MessageHandler.");
+                    }
                     continue;
                 }
+
+                if (_cancellationTokenSource.IsCancellationRequested)
+                    break;                
                     
                 try
                 {
@@ -222,6 +229,7 @@ namespace jNet.RPC.Server
         protected override void OnDispose()
         {
             base.OnDispose();
+            _cancellationTokenSource.Cancel();           
             ((ServerReferenceResolver)ReferenceResolver).ReferencePropertyChanged -= ReferenceResolver_ReferencePropertyChanged;
             lock (((IDictionary) _delegates).SyncRoot)
             {

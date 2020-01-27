@@ -74,8 +74,7 @@ namespace jNet.RPC.Server
         {
             if (!_knownDtos.TryGetValue(reference, out var p))            
                 return DtoBase.FindDto(reference);                             
-                                        
-                //throw new UnresolvedReferenceException(reference);                
+                                                                       
             return p;
         }
 

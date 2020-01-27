@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
+using System.Threading.Tasks;
 using Newtonsoft.Json.Serialization;
 
 namespace jNet.RPC.Client
@@ -70,29 +71,30 @@ namespace jNet.RPC.Client
             var id = new Guid(reference);
 
             if (!_knownDtos.TryGetValue(id, out var value))
-                return UnreferencedObjectFinder(id);
+                return UnreferencedObjectFinder(id).Result;
 
             Logger.Trace("Resolved reference {0} with {1}", reference, value);
             if (value.TryGetTarget(out var target))
                 return target;
 
-            _knownDtos.TryRemove(id, out _);
-            return null;
+            _knownDtos.TryRemove(id, out _);            
+            return UnreferencedObjectFinder(id).Result;
         }
 
         #endregion //IReferenceResolver
 
         internal event EventHandler<ProxyBaseEventArgs> ReferenceFinalized;
-        internal Func<Guid, ProxyBase> UnreferencedObjectFinder;       
+        internal Func<Guid, Task<ProxyBase>> UnreferencedObjectFinder;       
 
-        internal ProxyBase ResolveReference(Guid reference)
+        internal async Task<ProxyBase> ResolveReference(Guid reference)
         {
             if (!_knownDtos.TryGetValue(reference, out var p))
-                return UnreferencedObjectFinder(reference);
+                return await UnreferencedObjectFinder(reference).ConfigureAwait(false);
             if (p.TryGetTarget(out var target))
                 return target;
             _knownDtos.TryRemove(reference, out _);
-            return null;
+            
+            return await UnreferencedObjectFinder(reference).ConfigureAwait(false);
         }
 
         private void Proxy_Finalized(object sender, EventArgs e)
