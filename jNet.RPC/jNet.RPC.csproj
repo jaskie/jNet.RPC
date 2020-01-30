@@ -64,6 +64,7 @@
     <Compile Include="BitmapJsonConverter.cs" />
     <Compile Include="Client\ClientReferenceResolver.cs" />
     <Compile Include="Client\ProxyBaseEventArgs.cs" />
+    <Compile Include="Client\MessageController.cs" />
     <Compile Include="IRemoteHostConfig.cs" />
     <Compile Include="PropertyChangedWithValueEventArgs.cs" />
     <Compile Include="Server\IPrincipalProvider.cs" />

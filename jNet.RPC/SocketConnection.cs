@@ -159,7 +159,7 @@ namespace jNet.RPC
                         var serializedData = SerializeDto(message.Value);
                        
                         Client.Client.Send(message.ToByteArray(serializedData));
-                        //Logger.Debug($"Message {message.MessageGuid} sent. Type: {message.MessageType}");
+                        Logger.Debug($"Message {message.MessageGuid} sent. Type: {message.MessageType}");
                     }                                        
                 }
                 catch (Exception e) when (e is IOException || e is ArgumentNullException ||
@@ -203,9 +203,12 @@ namespace jNet.RPC
                             continue;
 
                         var message = new SocketMessage(dataBuffer);
-                        //Logger.Debug($"Message {message.MessageGuid} received. Type: {message.MessageType}");
 
-                        _receiveQueue.Enqueue(message);
+                       
+                        Logger.Debug($"Message {message.MessageGuid} received. Type: {message.MessageType}");
+
+                        if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
+                            _receiveQueue.Enqueue(message);
                         dataBuffer = null;
 
                         if (_messageHandlerSempahore.CurrentCount == 0)
