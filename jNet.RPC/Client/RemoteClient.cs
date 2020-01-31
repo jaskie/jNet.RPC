@@ -1,13 +1,7 @@
 ﻿//#undef DEBUG
 
 using System;
-using System.Collections;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
 using Newtonsoft.Json.Serialization;
 
 namespace jNet.RPC.Client
@@ -18,7 +12,7 @@ namespace jNet.RPC.Client
         private object _initialObject;
         private readonly ConcurrentDictionary<Guid, SocketMessage> _receivedMessages = new ConcurrentDictionary<Guid, SocketMessage>();                              
 
-        public RemoteClient(string address): base(address)
+        public RemoteClient()
         {
             
         }
@@ -56,7 +50,8 @@ namespace jNet.RPC.Client
                     methodName,
                     parameters.Length,
                     new SocketMessageArrayValue { Value = parameters });
-                return SendAndGetResponse<T>(queryMessage).Result;
+                Logger.Debug($"Asked for {dto}, method {methodName}");
+                return SendAndGetResponse<T>(queryMessage).Result;                
             }
             catch (Exception e)
             {
@@ -76,6 +71,7 @@ namespace jNet.RPC.Client
                     0,
                     null
                 );
+                Logger.Debug($"Asked for {dto}, property {propertyName}");
                 return SendAndGetResponse<T>(queryMessage).Result;
             }
             catch (Exception e)

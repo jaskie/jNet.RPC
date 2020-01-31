@@ -15,13 +15,20 @@ namespace jNet.RPC.Client
         private object _requestsLock = new object();    
         private readonly SemaphoreSlim _sendAndResponseSemaphore = new SemaphoreSlim(0);
         private readonly SemaphoreSlim _notificationSemaphore = new SemaphoreSlim(0);
-        private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
+        private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();       
 
-        public MessageController(string address) : base(address, new ClientReferenceResolver())
+        public MessageController() : base(new ClientReferenceResolver())
         {
             ((ClientReferenceResolver)ReferenceResolver).ReferenceFinalized += Resolver_ReferenceFinalized;
             ((ClientReferenceResolver)ReferenceResolver).UnreferencedObjectFinder = UnreferencedObjectFinder;
-            StartThreads();            
+            //StartThreads();
+
+            //_notificationHandlerThread = new Thread(NotificationHandlerProc)
+            //{
+            //    IsBackground = true,
+            //    Name = $"NotificationHandler for {Client.Client.RemoteEndPoint}"
+            //};
+            //_notificationHandlerThread.Start();
             _ = NotificationHandlerProc();
         }
 
@@ -83,7 +90,7 @@ namespace jNet.RPC.Client
                     --_requestsCount;
 
                 //Logger.Debug($"SAGR client satisified: {response.MessageGuid}");
-
+                
                 if (response.MessageType == SocketMessage.SocketMessageType.UnresolvedReferenceServer)
                     return default(T);
 
@@ -118,7 +125,7 @@ namespace jNet.RPC.Client
             }
         }
 
-        protected override async Task MessageHandlerProc()
+        protected override void MessageHandlerProc()
         {
             while (!_cancellationTokenSource.IsCancellationRequested)
             {
@@ -126,7 +133,7 @@ namespace jNet.RPC.Client
                 {
                     try
                     {
-                        await _messageHandlerSempahore.WaitAsync(_cancellationTokenSource.Token);
+                         _messageHandlerSempahore.Wait(_cancellationTokenSource.Token);
                     }
                     catch (Exception ex)
                     {
@@ -139,15 +146,7 @@ namespace jNet.RPC.Client
                 }
 
                 if (_cancellationTokenSource.IsCancellationRequested)
-                    break;
-
-
-                //if (message.MessageType != SocketMessage.SocketMessageType.RootQuery && _initialObject == null)
-                //{
-                //    _receiveQueue.Enqueue(message);
-                //    continue;
-                //}
-
+                    break;               
 
                 switch (message.MessageType)
                 {
@@ -174,7 +173,7 @@ namespace jNet.RPC.Client
                 {
                     try
                     {
-                        await _notificationSemaphore.WaitAsync(_cancellationTokenSource.Token);
+                        await _notificationSemaphore.WaitAsync(_cancellationTokenSource.Token).ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
@@ -188,9 +187,9 @@ namespace jNet.RPC.Client
 
                 if (_cancellationTokenSource.IsCancellationRequested)
                     break;
-
-                var notifyObject = await ((ClientReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
-                notifyObject?.OnEventNotificationMessage(message);
+                
+                var notifyObject = ((ClientReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
+                notifyObject?.OnEventNotificationMessage(message);               
             }
         }
     }

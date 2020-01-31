@@ -86,15 +86,12 @@ namespace jNet.RPC.Client
         internal event EventHandler<ProxyBaseEventArgs> ReferenceFinalized;
         internal Func<Guid, Task<ProxyBase>> UnreferencedObjectFinder;       
 
-        internal async Task<ProxyBase> ResolveReference(Guid reference)
+        internal ProxyBase ResolveReference(Guid reference)
         {
-            if (!_knownDtos.TryGetValue(reference, out var p))
-                return await UnreferencedObjectFinder(reference).ConfigureAwait(false);
-            if (p.TryGetTarget(out var target))
+            if (_knownDtos.TryGetValue(reference, out var p) && p.TryGetTarget(out var target))
                 return target;
-            _knownDtos.TryRemove(reference, out _);
-            
-            return await UnreferencedObjectFinder(reference).ConfigureAwait(false);
+
+            return null;
         }
 
         private void Proxy_Finalized(object sender, EventArgs e)
