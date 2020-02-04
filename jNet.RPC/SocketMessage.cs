@@ -108,8 +108,19 @@ namespace jNet.RPC
         {
             return $"WebSocketMessage: {MessageType}:{MemberName}";
         }
+        
+        public static SocketMessage WebSocketMessageCreate(SocketMessage.SocketMessageType SocketMessageType, IDto dto, string memberName, int paramsCount, object value)
+        {
+            return new SocketMessage(value)
+            {
+                MessageType = SocketMessageType,
+                DtoGuid = dto?.DtoGuid ?? Guid.Empty,
+                MemberName = memberName,
+                ParametersCount = paramsCount
+            };
+        }
 
-        public byte[] ToByteArray(Stream value)
+        public byte[] Encode(Stream value)
         {
             using (var stream = new MemoryStream())
             {

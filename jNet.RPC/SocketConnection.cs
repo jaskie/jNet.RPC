@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
 using System.Runtime.Serialization;
@@ -23,9 +20,8 @@ namespace jNet.RPC
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private int _disposed;
-        private readonly ConcurrentQueue<SocketMessage> _sendQueue = new ConcurrentQueue<SocketMessage>();
+        private readonly ConcurrentQueue<byte[]> _sendQueue = new ConcurrentQueue<byte[]>();
         protected readonly ConcurrentQueue<SocketMessage> _receiveQueue = new ConcurrentQueue<SocketMessage>();
-        private readonly object _sendLock = new object();
 
         private readonly int _maxQueueSize;
         private Thread _readThread;
@@ -33,8 +29,9 @@ namespace jNet.RPC
 
         private readonly AutoResetEvent _sendAutoResetEvent = new AutoResetEvent(false);
         protected readonly SemaphoreSlim _messageHandlerSempahore = new SemaphoreSlim(0);
+        private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
 
-        public TcpClient Client { get; }
+        public TcpClient Client { get; private set; }
         public JsonSerializer Serializer { get; } = JsonSerializer.CreateDefault();
         protected IReferenceResolver ReferenceResolver { get; }
 
@@ -52,28 +49,44 @@ namespace jNet.RPC
 #endif
         }
 
-        protected SocketConnection(string address, IReferenceResolver referenceResolver)
+        protected SocketConnection(IReferenceResolver referenceResolver)
         {
             ReferenceResolver = referenceResolver;
-            _maxQueueSize = 0x10000;
-            var port = 1060;
-            var addressParts = address.Split(':');
-            if (addressParts.Length > 1)
-                int.TryParse(addressParts[1], out port);
+            _maxQueueSize = 0x10000;                        
             Serializer = JsonSerializer.CreateDefault();
             Serializer.Context = new StreamingContext(StreamingContextStates.Remoting, this);
             Serializer.ReferenceResolver = referenceResolver;
             Serializer.TypeNameHandling = TypeNameHandling.Objects | TypeNameHandling.Arrays;
 #if DEBUG
             Serializer.Formatting = Formatting.Indented;
-#endif      
-            
+#endif                                     
+        }
+
+        public async Task<bool> Connect(string address)
+        {
+            var port = 1060;
+            var addressParts = address.Split(':');
+            if (addressParts.Length > 1)
+                int.TryParse(addressParts[1], out port);
+
             Client = new TcpClient
             {
-                NoDelay = true,
+                NoDelay = true,                
             };
-            Client.Connect(addressParts[0], port);
-            Logger.Info("Connection opened to {0}:{1}.", addressParts[0], port);
+
+            try
+            {
+                await Client.ConnectAsync(addressParts[0], port).ConfigureAwait(false);
+                Logger.Info("Connection opened to {0}:{1}.", addressParts[0], port);
+                StartThreads();
+                return true;
+            }
+            catch
+            {
+                Client.Close();
+                Disconnected?.Invoke(this, EventArgs.Empty);
+            }
+            return false;
         }
 
         protected void SetBinder(ISerializationBinder binder)
@@ -86,17 +99,15 @@ namespace jNet.RPC
             if (!IsConnected)
                 return;
             try
-            {         
-                lock(_sendLock) //to be sure that nothing is added between Count read and Enqueue (can Dequeue though)
+            {
+                if (_sendQueue.Count < _maxQueueSize)
                 {
-                    if (_sendQueue.Count < _maxQueueSize)
-                    {
-                        _sendQueue.Enqueue(message);
-                        _sendAutoResetEvent.Set();
-                        return;
-                    }
-                    Logger.Error("Message queue overflow");
-                }                    
+                    var serializedData = SerializeDto(message.Value);
+                    _sendQueue.Enqueue(message.Encode(serializedData));
+                    _sendAutoResetEvent.Set();
+                    return;
+                }
+                Logger.Error("Message queue overflow");
             }
             catch (Exception e)
             {
@@ -110,7 +121,7 @@ namespace jNet.RPC
         protected virtual void OnDispose()
         {
             IsConnected = false;
-            Client.Client.Dispose();
+            Client.Client?.Dispose();
             _sendAutoResetEvent.Set();
             _sendAutoResetEvent.Dispose();
             Logger.Info("Connection closed.");
@@ -121,9 +132,10 @@ namespace jNet.RPC
             if (Interlocked.Exchange(ref _disposed, 1) != default(int))
                 return;
             OnDispose();
+            _cancellationTokenSource.Cancel();
         }
 
-        public void StartThreads()
+        protected void StartThreads()
         {
             _readThread = new Thread(ReadThreadProc)
             {
@@ -133,7 +145,7 @@ namespace jNet.RPC
             _readThread.Start();
 
             _ = MessageHandlerProc();
-
+            
             _writeThread = new Thread(WriteThreadProc)
             {
                 IsBackground = true,
@@ -153,13 +165,10 @@ namespace jNet.RPC
                     _sendAutoResetEvent.WaitOne();
                     while (!_sendQueue.IsEmpty)
                     {                        
-                        if (!_sendQueue.TryDequeue(out var message))
+                        if (!_sendQueue.TryDequeue(out var serializedMessage))
                             continue;
-
-                        var serializedData = SerializeDto(message.Value);
-                       
-                        Client.Client.Send(message.ToByteArray(serializedData));
-                        //Logger.Debug($"Message {message.MessageGuid} sent. Type: {message.MessageType}");
+                                               
+                        Client.Client.Send(serializedMessage);                        
                     }                                        
                 }
                 catch (Exception e) when (e is IOException || e is ArgumentNullException ||
@@ -201,11 +210,7 @@ namespace jNet.RPC
                         dataIndex += receivedLength;
                         if (dataIndex != dataBuffer.Length)
                             continue;
-
-                        var message = new SocketMessage(dataBuffer);
-                        //Logger.Debug($"Message {message.MessageGuid} received. Type: {message.MessageType}");
-
-                        _receiveQueue.Enqueue(message);
+                        _receiveQueue.Enqueue(new SocketMessage(dataBuffer));
                         dataBuffer = null;
 
                         if (_messageHandlerSempahore.CurrentCount == 0)
@@ -222,7 +227,6 @@ namespace jNet.RPC
                 catch (Exception e)
                 {
                     dataBuffer = null;
-                    Debug.WriteLine("Read thread unexpected excpetion");
                     Logger.Error(e, "Read thread unexpected exception");
                 }
             }
@@ -234,7 +238,6 @@ namespace jNet.RPC
                 return;
             IsConnected = false;
             Disconnected?.Invoke(this, EventArgs.Empty);
-            Debug.WriteLine("Disconnected");
         }        
 
         protected Stream SerializeDto(object dto)

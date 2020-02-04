@@ -209,8 +209,7 @@ namespace jNet.RPC.Server
                 }
                 catch (Exception ex)
                 {
-                    _receiveQueue.Enqueue(message);                    
-                    await Task.Delay(50);
+                    _receiveQueue.Enqueue(message);                                       
 
                     Debug.WriteLine($"Exception while handling message. {ex.Message}");
                     Logger.Error(ex);
