@@ -80,8 +80,8 @@ namespace jNet.RPC.Server
                 }
 
                 if (_cancellationTokenSource.IsCancellationRequested)
-                    break;                
-                    
+                    break;
+
                 try
                 {
                     if (message.MessageType == SocketMessage.SocketMessageType.RootQuery)
@@ -110,7 +110,6 @@ namespace jNet.RPC.Server
                             switch (message.MessageType)
                             {
                                 case SocketMessage.SocketMessageType.Query:
-                                case SocketMessage.SocketMessageType.Invoke:
                                     var objectToInvokeType = objectToInvoke.GetType();
                                     var methodToInvoke = objectToInvokeType.GetMethods()
                                         .FirstOrDefault(m => m.Name == message.MemberName &&
@@ -122,7 +121,7 @@ namespace jNet.RPC.Server
                                         for (var i = 0; i < methodParameters.Length; i++)
                                             MethodParametersAlignment.AlignType(ref parameters.Value[i],
                                                 methodParameters[i].ParameterType);
-                                        object response;
+                                        object response = null;
                                         try
                                         {
                                             response = methodToInvoke.Invoke(objectToInvoke, parameters.Value);
@@ -132,8 +131,7 @@ namespace jNet.RPC.Server
                                             SendException(message, e);
                                             throw;
                                         }
-                                        if (message.MessageType == SocketMessage.SocketMessageType.Query)
-                                            SendResponse(message, response);
+                                        SendResponse(message, response);
                                     }
                                     else
                                         throw new ApplicationException(
@@ -168,6 +166,7 @@ namespace jNet.RPC.Server
                                         try
                                         {
                                             setProperty.SetValue(objectToInvoke, parameter, null);
+                                            SendResponse(message, null);
                                         }
                                         catch (Exception e)
                                         {
@@ -192,6 +191,7 @@ namespace jNet.RPC.Server
                                     else
                                         throw new ApplicationException(
                                             $"Server: unknown event: {objectToInvoke}:{message.MemberName}");
+                                    SendResponse(message, null);
                                     break;
                                 case SocketMessage.SocketMessageType.ProxyFinalized:
                                     RemoveReference(objectToInvoke);
@@ -209,13 +209,10 @@ namespace jNet.RPC.Server
                 }
                 catch (Exception ex)
                 {
-                    _receiveQueue.Enqueue(message);                                       
-
                     Debug.WriteLine($"Exception while handling message. {ex.Message}");
                     Logger.Error(ex);
                 }
             }
-            
         }
 
         

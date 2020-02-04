@@ -31,7 +31,7 @@ namespace jNet.RPC.Client
 
         private void Resolver_ReferenceFinalized(object sender, ProxyBaseEventArgs e)
         {
-            Send(SocketMessage.WebSocketMessageCreate(
+            Send(SocketMessage.Create(
                 SocketMessage.SocketMessageType.ProxyFinalized,
                 e.Proxy,
                 string.Empty,
@@ -59,7 +59,7 @@ namespace jNet.RPC.Client
             {
                 try
                 {
-                    await _requests[query.MessageGuid].SemaphoreSlim.WaitAsync().ConfigureAwait(false);
+                    await _requests[query.MessageGuid].Semaphore.WaitAsync(_cancellationTokenSource.Token).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -105,7 +105,7 @@ namespace jNet.RPC.Client
                 if (!_receiveQueue.TryDequeue(out var message))
                 {
                     try
-                    {                        
+                    {
                         await _messageHandlerSempahore.WaitAsync(_cancellationTokenSource.Token);
                     }
                     catch (Exception ex)
@@ -119,7 +119,7 @@ namespace jNet.RPC.Client
                 }
 
                 if (_cancellationTokenSource.IsCancellationRequested)
-                    break;               
+                    break;
 
                 switch (message.MessageType)
                 {
@@ -134,9 +134,9 @@ namespace jNet.RPC.Client
                             Logger.Debug("Message consumer not found!");
                             break;
                         }
-                            
+
                         request.Message = message;
-                        request.SemaphoreSlim.Release();                        
+                        request.Semaphore.Release();
                         break;
                 }
             }

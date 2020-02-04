@@ -13,7 +13,7 @@ namespace jNet.RPC.Client
         {
             try
             {
-                var queryMessage = SocketMessage.WebSocketMessageCreate(SocketMessage.SocketMessageType.RootQuery, null, null, 0, null);
+                var queryMessage = SocketMessage.Create(SocketMessage.SocketMessageType.RootQuery, null, null, 0, null);
                 var response = SendAndGetResponse<T>(queryMessage).Result;                
                 return response;
             }
@@ -28,7 +28,7 @@ namespace jNet.RPC.Client
         {
             try
             {
-                var queryMessage = SocketMessage.WebSocketMessageCreate(
+                var queryMessage = SocketMessage.Create(
                     SocketMessage.SocketMessageType.Query,
                     dto,
                     methodName,
@@ -47,7 +47,7 @@ namespace jNet.RPC.Client
         {
             try
             {
-                var queryMessage = SocketMessage.WebSocketMessageCreate(
+                var queryMessage = SocketMessage.Create(
                     SocketMessage.SocketMessageType.Get,
                     dto,
                     propertyName,
@@ -65,42 +65,78 @@ namespace jNet.RPC.Client
 
         public void Invoke(ProxyBase dto, string methodName, params object[] parameters)
         {
-            Send(SocketMessage.WebSocketMessageCreate(
-                SocketMessage.SocketMessageType.Invoke,
-                dto,
-                methodName,
-                parameters.Length,
-                new SocketMessageArrayValue{Value = parameters}));
+            try
+            {
+                var queryMessage = SocketMessage.Create(
+                    SocketMessage.SocketMessageType.Query,
+                    dto,
+                    methodName,
+                    parameters.Length,
+                    new SocketMessageArrayValue { Value = parameters });
+                SendAndGetResponse<object>(queryMessage).Wait();
+            }
+            catch (Exception e)
+            {
+                Logger.Error("From Invoke {0}: {1}", dto, e);
+                throw;
+            }
         }
 
         public void Set(ProxyBase dto, object value, string propertyName)
         {
-            Send(SocketMessage.WebSocketMessageCreate(
+            try
+            {
+                var queryMessage = SocketMessage.Create(
                 SocketMessage.SocketMessageType.Set,
                 dto,
                 propertyName,
                 1,
-                value));
+                value);
+                SendAndGetResponse<object>(queryMessage).Wait();
+            }
+            catch (Exception e)
+            {
+                Logger.Error("From Set {0}: {1}", dto, e);
+                throw;
+            }
         }
 
         public void EventAdd(ProxyBase dto, string eventName)
         {
-            Send(SocketMessage.WebSocketMessageCreate(
+            try
+            {
+                var queryMessage = SocketMessage.Create(
                 SocketMessage.SocketMessageType.EventAdd,
                 dto,
                 eventName,
                 0,
-                null));
+                null);
+                SendAndGetResponse<object>(queryMessage).Wait();
+            }
+            catch (Exception e)
+            {
+                Logger.Error("From Invoke {0}: {1}", dto, e);
+                throw;
+            }
         }
 
         public void EventRemove(ProxyBase dto, string eventName)
         {
-            Send(SocketMessage.WebSocketMessageCreate(
+            try
+            {
+                var queryMessage = SocketMessage.Create(
                 SocketMessage.SocketMessageType.EventRemove,
                 dto,
                 eventName,
                 0,
-                null));
+                null);
+                SendAndGetResponse<object>(queryMessage).Wait();
+            }
+            catch (Exception e)
+            {
+                Logger.Error("From Invoke {0}: {1}", dto, e);
+                throw;
+            }
         }
     }
 }

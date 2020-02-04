@@ -144,7 +144,7 @@ namespace jNet.RPC
             };
             _readThread.Start();
 
-            _ = MessageHandlerProc();
+            Task.Factory.StartNew(MessageHandlerProc, TaskCreationOptions.LongRunning);
             
             _writeThread = new Thread(WriteThreadProc)
             {

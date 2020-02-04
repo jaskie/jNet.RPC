@@ -11,7 +11,6 @@ namespace jNet.RPC
         {
             RootQuery,
             Query,
-            Invoke,
             Get,
             Set,
             EventAdd,
@@ -109,7 +108,7 @@ namespace jNet.RPC
             return $"WebSocketMessage: {MessageType}:{MemberName}";
         }
         
-        public static SocketMessage WebSocketMessageCreate(SocketMessage.SocketMessageType SocketMessageType, IDto dto, string memberName, int paramsCount, object value)
+        public static SocketMessage Create(SocketMessageType SocketMessageType, IDto dto, string memberName, int paramsCount, object value)
         {
             return new SocketMessage(value)
             {
