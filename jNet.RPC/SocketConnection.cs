@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
@@ -30,7 +28,7 @@ namespace jNet.RPC
         private readonly int _maxQueueSize;
         private Thread _readThread;
         private Thread _writeThread;
-        private Thread _messageHandlerThread;
+        //private Thread _messageHandlerThread;
 
         private readonly AutoResetEvent _sendAutoResetEvent = new AutoResetEvent(false);
         protected readonly SemaphoreSlim _messageHandlerSempahore = new SemaphoreSlim(0);
@@ -67,7 +65,7 @@ namespace jNet.RPC
 #endif                                     
         }
 
-        public void Connect(string address)
+        public async Task<bool> Connect(string address)
         {
             var port = 1060;
             var addressParts = address.Split(':');
@@ -76,20 +74,23 @@ namespace jNet.RPC
 
             Client = new TcpClient
             {
-                NoDelay = true,
+                NoDelay = true,                
             };
 
             try
             {
-                Client.Connect(addressParts[0], port);
+                await Client.ConnectAsync(addressParts[0], port).ConfigureAwait(false);
                 Logger.Info("Connection opened to {0}:{1}.", addressParts[0], port);
                 StartThreads();
+                return true;
             }
             catch
-            {                
-                Client.Client?.Dispose();
+            {
+                Debug.WriteLine($"{address} disconnected");
+                Client.Close();
                 Disconnected?.Invoke(this, EventArgs.Empty);
             }
+            return false;
         }
 
         protected void SetBinder(ISerializationBinder binder)
@@ -109,7 +110,7 @@ namespace jNet.RPC
                     {
                         var serializedData = SerializeDto(message.Value);
                         _sendQueue.Enqueue(message.ToByteArray(serializedData));
-                        //Logger.Debug($"Message {message.MessageGuid} added to send queue. Type: {message.MessageType}");
+                        Logger.Debug($"Message {message.MessageGuid} added to send queue. Type: {message.MessageType}");
                         _sendAutoResetEvent.Set();
                         return;
                     }
@@ -128,7 +129,7 @@ namespace jNet.RPC
         protected virtual void OnDispose()
         {
             IsConnected = false;
-            Client.Client.Dispose();
+            Client.Client?.Dispose();
             _sendAutoResetEvent.Set();
             _sendAutoResetEvent.Dispose();
             Logger.Info("Connection closed.");
@@ -142,7 +143,7 @@ namespace jNet.RPC
             _cancellationTokenSource.Cancel();
         }
 
-        private void StartThreads()
+        protected void StartThreads()
         {
             _readThread = new Thread(ReadThreadProc)
             {
@@ -151,12 +152,13 @@ namespace jNet.RPC
             };
             _readThread.Start();
 
-            _messageHandlerThread = new Thread(MessageHandlerProc)
-            {
-                IsBackground = true,
-                Name = $"MessageHandler for { Client.Client.RemoteEndPoint }"
-            };
-            _messageHandlerThread.Start();
+            _ = MessageHandlerProc();
+            //_messageHandlerThread = new Thread(MessageHandlerProc)
+            //{
+            //    IsBackground = true,
+            //    Name = $"MessageHandler for { Client.Client.RemoteEndPoint }"
+            //};
+            //_messageHandlerThread.Start();
 
             _writeThread = new Thread(WriteThreadProc)
             {
@@ -167,7 +169,7 @@ namespace jNet.RPC
         }
 
         public event EventHandler Disconnected;
-        protected abstract void MessageHandlerProc();
+        protected abstract Task MessageHandlerProc();
         protected virtual void WriteThreadProc()
         {
             while (IsConnected)

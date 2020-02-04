@@ -89,7 +89,7 @@ namespace jNet.RPC.Client
                 lock (_requestsLock)
                     --_requestsCount;
 
-                //Logger.Debug($"SAGR client satisified: {response.MessageGuid}");
+                Logger.Debug($"SAGR client satisified: {response.MessageGuid}");
                 
                 if (response.MessageType == SocketMessage.SocketMessageType.UnresolvedReferenceServer)
                     return default(T);
@@ -125,7 +125,7 @@ namespace jNet.RPC.Client
             }
         }
 
-        protected override void MessageHandlerProc()
+        protected override async Task MessageHandlerProc()
         {
             while (!_cancellationTokenSource.IsCancellationRequested)
             {
@@ -133,7 +133,7 @@ namespace jNet.RPC.Client
                 {
                     try
                     {
-                         _messageHandlerSempahore.Wait(_cancellationTokenSource.Token);
+                        await _messageHandlerSempahore.WaitAsync(_cancellationTokenSource.Token);
                     }
                     catch (Exception ex)
                     {

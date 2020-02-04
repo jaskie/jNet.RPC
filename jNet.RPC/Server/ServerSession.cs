@@ -34,7 +34,7 @@ namespace jNet.RPC.Server
             if (_sessionUser == null)
                 throw new UnauthorizedAccessException($"Client {Client.Client.RemoteEndPoint} not allowed");
             ((ServerReferenceResolver)ReferenceResolver).ReferencePropertyChanged += ReferenceResolver_ReferencePropertyChanged;
-            //StartThreads();           
+            StartThreads();           
         }
 
 #if DEBUG
@@ -57,7 +57,7 @@ namespace jNet.RPC.Server
         }
 
 
-        protected override void MessageHandlerProc()
+        protected override async Task MessageHandlerProc()
         {
             Thread.CurrentPrincipal = _sessionUser;
 
@@ -67,7 +67,7 @@ namespace jNet.RPC.Server
                 {
                     try
                     {
-                        _messageHandlerSempahore.Wait(_cancellationTokenSource.Token);
+                        await _messageHandlerSempahore.WaitAsync(_cancellationTokenSource.Token);
                     }
                     catch (Exception ex)
                     {
