@@ -10,26 +10,16 @@ namespace jNet.RPC.Client
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private readonly ConcurrentQueue<SocketMessage> _notificationQueue = new ConcurrentQueue<SocketMessage>();
-        private readonly ConcurrentDictionary<Guid, SocketMessage> _messageQueue = new ConcurrentDictionary<Guid, SocketMessage>();
-        private int _requestsCount = 0;
-        private object _requestsLock = new object();    
-        private readonly SemaphoreSlim _sendAndResponseSemaphore = new SemaphoreSlim(0);
+        private readonly ConcurrentDictionary<Guid, MessageRequest> _requests = new ConcurrentDictionary<Guid, MessageRequest>();
         private readonly SemaphoreSlim _notificationSemaphore = new SemaphoreSlim(0);
-        private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();       
+        private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
+        
 
         public MessageController() : base(new ClientReferenceResolver())
         {
             ((ClientReferenceResolver)ReferenceResolver).ReferenceFinalized += Resolver_ReferenceFinalized;
-            ((ClientReferenceResolver)ReferenceResolver).UnreferencedObjectFinder = UnreferencedObjectFinder;
-            //StartThreads();
-
-            //_notificationHandlerThread = new Thread(NotificationHandlerProc)
-            //{
-            //    IsBackground = true,
-            //    Name = $"NotificationHandler for {Client.Client.RemoteEndPoint}"
-            //};
-            //_notificationHandlerThread.Start();
-            _ = NotificationHandlerProc();
+            ((ClientReferenceResolver)ReferenceResolver).UnreferencedObjectFinder = UnreferencedObjectFinder;            
+            _ = NotificationHandlerProc();            
         }
 
         protected override void OnDispose()
@@ -50,8 +40,7 @@ namespace jNet.RPC.Client
         }
 
         private async Task<ProxyBase> UnreferencedObjectFinder(Guid guid)
-        {
-            //Logger.Debug($"Unresolved reference! {guid}");
+        {            
             var proxy = await SendAndGetResponse<ProxyBase>(new SocketMessage((object)null)
             {
                 MessageType = SocketMessage.SocketMessageType.UnresolvedReference,
@@ -64,14 +53,13 @@ namespace jNet.RPC.Client
 
         protected async Task<T> SendAndGetResponse<T>(SocketMessage query)
         {
-            lock (_requestsLock)
-                ++_requestsCount;
+            _requests.TryAdd(query.MessageGuid, new MessageRequest());
             Send(query);
             while (IsConnected)
             {
                 try
                 {
-                    await _sendAndResponseSemaphore.WaitAsync(_cancellationTokenSource.Token).ConfigureAwait(false);
+                    await _requests[query.MessageGuid].SemaphoreSlim.WaitAsync().ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -80,34 +68,33 @@ namespace jNet.RPC.Client
 
                     Logger.Error(ex, "Unexpected error in SendAndGetResponseProc");
                 }
-
-                SocketMessage response;
-
-                if (!_messageQueue.TryRemove(query.MessageGuid, out response))
+               
+                if (!_requests.TryRemove(query.MessageGuid, out var response))
+                {
+                    Logger.Warn($"SAGR client trapped! {response.Message.MessageGuid}:{response.Message.MessageType}");
                     continue;
+                }
+                    
 
-                lock (_requestsLock)
-                    --_requestsCount;
-
-                Logger.Debug($"SAGR client satisified: {response.MessageGuid}");
+                //Logger.Debug($"SAGR client satisified: {response.Message.MessageGuid}");
                 
-                if (response.MessageType == SocketMessage.SocketMessageType.UnresolvedReferenceServer)
+                if (response.Message.MessageType == SocketMessage.SocketMessageType.UnresolvedReferenceServer)
                     return default(T);
 
-                if (response.MessageType == SocketMessage.SocketMessageType.Exception)
-                    throw Deserialize<Exception>(response);
+                if (response.Message.MessageType == SocketMessage.SocketMessageType.Exception)
+                    throw Deserialize<Exception>(response.Message);
 
-                var result = Deserialize<T>(response);
+                var result = Deserialize<T>(response.Message);
                 return result;
             }
             return default(T);
         }
 
-        protected SocketMessage WebSocketMessageCreate(SocketMessage.SocketMessageType socketMessageType, IDto dto, string memberName, int paramsCount, object value)
+        protected SocketMessage WebSocketMessageCreate(SocketMessage.SocketMessageType SocketMessageType, IDto dto, string memberName, int paramsCount, object value)
         {
             return new SocketMessage(value)
             {
-                MessageType = socketMessageType,
+                MessageType = SocketMessageType,
                 DtoGuid = dto?.DtoGuid ?? Guid.Empty,
                 MemberName = memberName,
                 ParametersCount = paramsCount
@@ -132,7 +119,7 @@ namespace jNet.RPC.Client
                 if (!_receiveQueue.TryDequeue(out var message))
                 {
                     try
-                    {
+                    {                        
                         await _messageHandlerSempahore.WaitAsync(_cancellationTokenSource.Token);
                     }
                     catch (Exception ex)
@@ -156,11 +143,14 @@ namespace jNet.RPC.Client
                             _notificationSemaphore.Release();
                         break;
                     default:
-                        _messageQueue[message.MessageGuid] = message;
-
-                        lock (_requestsLock)
-                            if (_requestsCount > 0)
-                                _sendAndResponseSemaphore.Release(_requestsCount);
+                        if (!_requests.TryGetValue(message.MessageGuid, out var request))
+                        {
+                            Logger.Debug("Message consumer not found!");
+                            break;
+                        }
+                            
+                        request.Message = message;
+                        request.SemaphoreSlim.Release();                        
                         break;
                 }
             }

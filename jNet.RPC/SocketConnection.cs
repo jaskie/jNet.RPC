@@ -110,7 +110,7 @@ namespace jNet.RPC
                     {
                         var serializedData = SerializeDto(message.Value);
                         _sendQueue.Enqueue(message.ToByteArray(serializedData));
-                        Logger.Debug($"Message {message.MessageGuid} added to send queue. Type: {message.MessageType}");
+                        //Logger.Debug($"Message {message.MessageGuid} added to send queue. Type: {message.MessageType}");
                         _sendAutoResetEvent.Set();
                         return;
                     }
@@ -153,13 +153,7 @@ namespace jNet.RPC
             _readThread.Start();
 
             _ = MessageHandlerProc();
-            //_messageHandlerThread = new Thread(MessageHandlerProc)
-            //{
-            //    IsBackground = true,
-            //    Name = $"MessageHandler for { Client.Client.RemoteEndPoint }"
-            //};
-            //_messageHandlerThread.Start();
-
+            
             _writeThread = new Thread(WriteThreadProc)
             {
                 IsBackground = true,
@@ -227,8 +221,8 @@ namespace jNet.RPC
 
                         var message = new SocketMessage(dataBuffer);
                         
-                        if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
-                            Logger.Debug($"Message {message.MessageGuid} received. Type: {message.MessageType}");
+                        //if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
+                        //    Logger.Debug($"Message {message.MessageGuid} received. Type: {message.MessageType}");
                         
                         _receiveQueue.Enqueue(message);
                         dataBuffer = null;

@@ -6,11 +6,9 @@ using Newtonsoft.Json.Serialization;
 
 namespace jNet.RPC.Client
 {
-    public class RemoteClient: MessageController
+    public class RemoteClient : MessageController
     {
-        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
-        private object _initialObject;
-        private readonly ConcurrentDictionary<Guid, SocketMessage> _receivedMessages = new ConcurrentDictionary<Guid, SocketMessage>();                              
+        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();               
 
         public RemoteClient()
         {
@@ -29,8 +27,7 @@ namespace jNet.RPC.Client
             try
             {
                 var queryMessage = WebSocketMessageCreate(SocketMessage.SocketMessageType.RootQuery, null, null, 0, null);
-                var response = SendAndGetResponse<T>(queryMessage).Result;
-                _initialObject = response;
+                var response = SendAndGetResponse<T>(queryMessage).Result;                
                 return response;
             }
             catch (Exception e)
@@ -50,7 +47,7 @@ namespace jNet.RPC.Client
                     methodName,
                     parameters.Length,
                     new SocketMessageArrayValue { Value = parameters });
-                Logger.Debug($"Asked for {dto}, method {methodName}");
+                //Logger.Debug($"Asked for {dto}, method {methodName}");
                 return SendAndGetResponse<T>(queryMessage).Result;                
             }
             catch (Exception e)
@@ -71,7 +68,7 @@ namespace jNet.RPC.Client
                     0,
                     null
                 );
-                Logger.Debug($"Asked for {dto}, property {propertyName}");
+                //Logger.Debug($"Asked for {dto}, property {propertyName}");
                 return SendAndGetResponse<T>(queryMessage).Result;
             }
             catch (Exception e)
