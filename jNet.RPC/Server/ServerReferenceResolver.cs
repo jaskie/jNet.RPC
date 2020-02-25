@@ -63,7 +63,12 @@ namespace jNet.RPC.Server
         {
             var id = new Guid(reference);
             if (!_knownDtos.TryGetValue(id, out var value))
-                throw new UnresolvedReferenceException(id);
+            {
+                var dto = DtoBase.FindDto(id);              
+                Logger.Warn("Returning hard DTO (not found in known dtos)! {0}", dto.DtoGuid);
+                return dto;
+            }
+                
             Logger.Trace("ResolveReference {0} with {1}", reference, value);
             return value;
         }

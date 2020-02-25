@@ -1,6 +1,7 @@
 ﻿#undef DEBUG
 
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -62,8 +63,8 @@ namespace jNet.RPC.Client
                         .Any(a => ((JsonPropertyAttribute) a).PropertyName == propertyName));
             if (field != null)
             {
-                var currentValue = field.GetValue(this);
-                if (value.Equals(currentValue))
+                var currentValue = (T)field.GetValue(this);
+                if (EqualityComparer<T>.Default.Equals(value, currentValue))
                     return;
             }
             _client.Set(this, value, propertyName);

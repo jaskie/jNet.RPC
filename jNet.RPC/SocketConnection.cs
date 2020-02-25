@@ -21,14 +21,15 @@ namespace jNet.RPC
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private int _disposed;
         private readonly ConcurrentQueue<byte[]> _sendQueue = new ConcurrentQueue<byte[]>();
-        protected readonly ConcurrentQueue<SocketMessage> _receiveQueue = new ConcurrentQueue<SocketMessage>();
+        
+        protected readonly ConcurrentQueue<SocketMessage> _unresolvedQueue = new ConcurrentQueue<SocketMessage>();
 
         private readonly int _maxQueueSize;
         private Thread _readThread;
         private Thread _writeThread;
 
         private readonly AutoResetEvent _sendAutoResetEvent = new AutoResetEvent(false);
-        protected readonly SemaphoreSlim _messageHandlerSempahore = new SemaphoreSlim(0);
+        protected readonly SemaphoreSlim _messageReceivedSempahore = new SemaphoreSlim(0);
         private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
 
         public TcpClient Client { get; private set; }
@@ -104,6 +105,8 @@ namespace jNet.RPC
                 {
                     var serializedData = SerializeDto(message.Value);
                     _sendQueue.Enqueue(message.Encode(serializedData));
+                    //if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
+                    //    Logger.Debug("Message queued to send {0}:{1}", message.MessageGuid, message.MessageType);
                     _sendAutoResetEvent.Set();
                     return;
                 }
@@ -144,8 +147,8 @@ namespace jNet.RPC
             };
             _readThread.Start();
 
-            Task.Factory.StartNew(MessageHandlerProc, TaskCreationOptions.LongRunning);
-            
+            Task.Factory.StartNew(MessageHandlerProc, TaskCreationOptions.LongRunning);           
+
             _writeThread = new Thread(WriteThreadProc)
             {
                 IsBackground = true,
@@ -153,8 +156,9 @@ namespace jNet.RPC
             };
             _writeThread.Start();            
         }
-
+       
         public event EventHandler Disconnected;
+        protected abstract void EnqueueMessage(SocketMessage message);
         protected abstract Task MessageHandlerProc();
         protected virtual void WriteThreadProc()
         {
@@ -197,11 +201,13 @@ namespace jNet.RPC
                 {
                     if (dataBuffer == null)
                     {
-                        if (stream.Read(sizeBuffer, 0, sizeof(int)) == sizeof(int))
+                        var bytes = stream.Read(sizeBuffer, 0, sizeof(int));
+                        if (bytes == sizeof(int))
                         {
                             var dataLength = BitConverter.ToUInt32(sizeBuffer, 0);
                             dataBuffer = new byte[dataLength];
                         }
+                        else { }
                         dataIndex = 0;
                     }
                     else
@@ -210,13 +216,11 @@ namespace jNet.RPC
                         dataIndex += receivedLength;
                         if (dataIndex != dataBuffer.Length)
                             continue;
-                        _receiveQueue.Enqueue(new SocketMessage(dataBuffer));
-                        dataBuffer = null;
-
-                        if (_messageHandlerSempahore.CurrentCount == 0)
-                            _messageHandlerSempahore.Release();
-
-                        
+                        var message = new SocketMessage(dataBuffer);
+                        //if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
+                        //    Logger.Debug("Message received {0}:{1}", message.MessageGuid, message.MessageType);
+                        EnqueueMessage(message);
+                        dataBuffer = null;                                               
                     }
                 }
                 catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is SocketException)

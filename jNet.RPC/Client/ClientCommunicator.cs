@@ -8,18 +8,16 @@ namespace jNet.RPC.Client
 {
     public abstract class ClientCommunicator : SocketConnection
     {
-        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
-        private readonly ConcurrentQueue<SocketMessage> _notificationQueue = new ConcurrentQueue<SocketMessage>();
-        private readonly ConcurrentDictionary<Guid, MessageRequest> _requests = new ConcurrentDictionary<Guid, MessageRequest>();
-        private readonly SemaphoreSlim _notificationSemaphore = new SemaphoreSlim(0);
+        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();       
+        protected readonly ConcurrentQueue<SocketMessage> _receiveQueue = new ConcurrentQueue<SocketMessage>();
+        private readonly ConcurrentDictionary<Guid, MessageRequest> _requests = new ConcurrentDictionary<Guid, MessageRequest>();        
         private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
-        
+        private readonly SemaphoreSlim _messageHandledSemaphore = new SemaphoreSlim(1);
 
         public ClientCommunicator() : base(new ClientReferenceResolver())
         {
             ((ClientReferenceResolver)ReferenceResolver).ReferenceFinalized += Resolver_ReferenceFinalized;
-            ((ClientReferenceResolver)ReferenceResolver).UnreferencedObjectFinder = UnreferencedObjectFinder;            
-            _ = NotificationHandlerProc();            
+            ((ClientReferenceResolver)ReferenceResolver).UnreferencedObjectFinder = UnreferencedObjectFinder;                                   
         }
 
         protected override void OnDispose()
@@ -49,6 +47,27 @@ namespace jNet.RPC.Client
 
             Logger.Trace("Unresolved reference restored: {0}:{1}", guid, proxy);
             return proxy;
+        }
+
+        protected override void EnqueueMessage(SocketMessage message)
+        {
+            if (message.MessageType == SocketMessage.SocketMessageType.UnresolvedReference || message.MessageType == SocketMessage.SocketMessageType.UnresolvedReferenceServer)
+            {
+                if (!_requests.TryGetValue(message.MessageGuid, out var request))
+                {
+                    Logger.Debug("Message consumer not found!");
+                    return;
+                }
+
+                request.Message = message;
+                request.Semaphore.Release();               
+            }
+            else
+            {
+                _receiveQueue.Enqueue(message);
+                if (_messageReceivedSempahore.CurrentCount == 0)
+                    _messageReceivedSempahore.Release();
+            }                
         }
 
         protected async Task<T> SendAndGetResponse<T>(SocketMessage query)
@@ -85,18 +104,7 @@ namespace jNet.RPC.Client
                 return result;
             }
             return default(T);
-        }
-                
-        private T Deserialize<T>(SocketMessage message)
-        {
-            using (var valueStream = message.ValueStream)
-            {
-                if (valueStream == null)
-                    return default(T);
-                using (var reader = new StreamReader(valueStream))
-                    return (T)Serializer.Deserialize(reader, typeof(T));
-            }
-        }
+        }                       
 
         protected override async Task MessageHandlerProc()
         {
@@ -106,7 +114,7 @@ namespace jNet.RPC.Client
                 {
                     try
                     {
-                        await _messageHandlerSempahore.WaitAsync(_cancellationTokenSource.Token);
+                        await _messageReceivedSempahore.WaitAsync(_cancellationTokenSource.Token);
                     }
                     catch (Exception ex)
                     {
@@ -118,15 +126,17 @@ namespace jNet.RPC.Client
                     continue;
                 }
 
+                await _messageHandledSemaphore.WaitAsync(_cancellationTokenSource.Token);
+
                 if (_cancellationTokenSource.IsCancellationRequested)
                     break;
 
                 switch (message.MessageType)
                 {
                     case SocketMessage.SocketMessageType.EventNotification:
-                        _notificationQueue.Enqueue(message);
-                        if (_notificationSemaphore.CurrentCount == 0)
-                            _notificationSemaphore.Release();
+                        var notifyObject = ((ClientReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
+                        notifyObject?.OnEventNotificationMessage(message);
+                        _messageHandledSemaphore.Release();
                         break;
                     default:
                         if (!_requests.TryGetValue(message.MessageGuid, out var request))
@@ -137,35 +147,20 @@ namespace jNet.RPC.Client
 
                         request.Message = message;
                         request.Semaphore.Release();
+                        _messageHandledSemaphore.Release();
                         break;
                 }
             }
         }
-        private async Task NotificationHandlerProc()
+        
+        private T Deserialize<T>(SocketMessage message)
         {
-            while (!_cancellationTokenSource.IsCancellationRequested)
+            using (var valueStream = message.ValueStream)
             {
-                if (!_notificationQueue.TryDequeue(out var message))
-                {
-                    try
-                    {
-                        await _notificationSemaphore.WaitAsync(_cancellationTokenSource.Token).ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        if (ex.GetType() == typeof(OperationCanceledException))
-                            break;
-
-                        Logger.Error(ex, "Unexpected error in NotificationHandlerProc");
-                    }
-                    continue;
-                }
-
-                if (_cancellationTokenSource.IsCancellationRequested)
-                    break;
-                
-                var notifyObject = ((ClientReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
-                notifyObject?.OnEventNotificationMessage(message);               
+                if (valueStream == null)
+                    return default(T);
+                using (var reader = new StreamReader(valueStream))
+                    return (T)Serializer.Deserialize(reader, typeof(T));
             }
         }
     }

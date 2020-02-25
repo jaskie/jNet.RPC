@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -22,6 +23,7 @@ namespace jNet.RPC.Server
         private readonly IDto _initialObject;
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
+        protected readonly ConcurrentQueue<SocketMessage> _receiveQueue = new ConcurrentQueue<SocketMessage>();
         private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();               
 
         public ServerSession(TcpClient client, IDto initialObject, IPrincipalProvider principalProvider): base(client, new ServerReferenceResolver())
@@ -56,6 +58,12 @@ namespace jNet.RPC.Server
             base.WriteThreadProc();
         }
 
+        protected override void EnqueueMessage(SocketMessage message)
+        {
+            _receiveQueue.Enqueue(message);
+            if (_messageReceivedSempahore.CurrentCount == 0)
+                _messageReceivedSempahore.Release();
+        }        
 
         protected override async Task MessageHandlerProc()
         {
@@ -67,7 +75,7 @@ namespace jNet.RPC.Server
                 {
                     try
                     {
-                        await _messageHandlerSempahore.WaitAsync(_cancellationTokenSource.Token);
+                        await _messageReceivedSempahore.WaitAsync(_cancellationTokenSource.Token);
                     }
                     catch (Exception ex)
                     {
