@@ -90,6 +90,9 @@ namespace jNet.RPC.Server
                 if (_cancellationTokenSource.IsCancellationRequested)
                     break;
 
+                if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
+                    Logger.Debug("Processing message: {0}:{1}", message.MessageGuid, message.DtoGuid);
+                
                 try
                 {
                     if (message.MessageType == SocketMessage.SocketMessageType.RootQuery)
@@ -203,6 +206,7 @@ namespace jNet.RPC.Server
                                     break;
                                 case SocketMessage.SocketMessageType.ProxyFinalized:
                                     RemoveReference(objectToInvoke);
+                                    SendResponse(message, null);
                                     break;
                             }
                         }
@@ -219,7 +223,7 @@ namespace jNet.RPC.Server
                 {
                     Debug.WriteLine($"Exception while handling message. {ex.Message}");
                     Logger.Error(ex);
-                }
+                }                                
             }
         }
 

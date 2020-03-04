@@ -137,6 +137,6 @@ namespace jNet.RPC.Client
                 Logger.Error("From Invoke {0}: {1}", dto, e);
                 throw;
             }
-        }
+        }        
     }
 }

@@ -34,7 +34,7 @@ namespace jNet.RPC.Client
                 e.Proxy,
                 string.Empty,
                 0,
-                null));
+                null));            
         }
 
         private async Task<ProxyBase> UnreferencedObjectFinder(Guid guid)
@@ -131,13 +131,21 @@ namespace jNet.RPC.Client
                 if (_cancellationTokenSource.IsCancellationRequested)
                     break;
 
+                if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
+                    Logger.Debug("Processing message: {0}:{1}", message.MessageGuid, message.DtoGuid);
+
                 switch (message.MessageType)
                 {
+                    case SocketMessage.SocketMessageType.ProxyFinalized:
                     case SocketMessage.SocketMessageType.EventNotification:
                         var notifyObject = ((ClientReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
-                        notifyObject?.OnEventNotificationMessage(message);
+                        if (notifyObject == null)
+                            Logger.Debug("NotifyObject null: {0}:{1}", message.DtoGuid);
+
+                        notifyObject?.OnNotificationMessage(message);
                         _messageHandledSemaphore.Release();
                         break;
+                                            
                     default:
                         if (!_requests.TryGetValue(message.MessageGuid, out var request))
                         {
@@ -151,8 +159,8 @@ namespace jNet.RPC.Client
                         break;
                 }
             }
-        }
-        
+        }        
+
         private T Deserialize<T>(SocketMessage message)
         {
             using (var valueStream = message.ValueStream)

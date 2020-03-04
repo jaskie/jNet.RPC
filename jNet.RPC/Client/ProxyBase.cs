@@ -1,6 +1,7 @@
-﻿#undef DEBUG
+﻿//#undef DEBUG
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -8,8 +9,10 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Threading;
+using Microsoft.Win32.SafeHandles;
 using Newtonsoft.Json;
 
 namespace jNet.RPC.Client
@@ -18,19 +21,45 @@ namespace jNet.RPC.Client
     public abstract class ProxyBase : IDto
     {
         private int _isDisposed;
+        private bool _hasFinalized;
         private RemoteClient _client;
         private const int DisposedValue = 1;
-
+        private static readonly ConcurrentDictionary<Guid, ProxyBase> _finalizeRequestedDtos = new ConcurrentDictionary<Guid, ProxyBase>();
+       
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _isDisposed, DisposedValue) == default(int))
                 DoDispose();
         }
-
+        
         ~ProxyBase()
         {
-            Debug.WriteLine(this, $"{GetType().FullName} Finalized");
-            Finalized?.Invoke(this, EventArgs.Empty);
+            if (!_hasFinalized) //first finalization will send request to server; on response hard reference would be deleted and object collected in next GC run
+            {
+                _finalizeRequestedDtos.TryAdd(DtoGuid, this);
+                _hasFinalized = true;
+                GC.ReRegisterForFinalize(this);
+
+                Finalized?.Invoke(this, EventArgs.Empty);
+            }            
+        }
+
+        public void FinalizeProxy()
+        {
+            Debug.WriteLine("Proxy removed from finalizedDict {0}", DtoGuid);
+            _finalizeRequestedDtos.TryRemove(DtoGuid, out _);
+            Debug.WriteLine(_finalizeRequestedDtos.Count);
+        }
+
+        public static ProxyBase GetFinalizeRequestedProxy(Guid guid)
+        {
+            _finalizeRequestedDtos.TryGetValue(guid, out var proxy);
+            return proxy;
+        }
+
+        public bool IsFinalizeRequested()
+        {
+            return _finalizeRequestedDtos.ContainsKey(DtoGuid);
         }
 
         public Guid DtoGuid { get; internal set; }
@@ -39,7 +68,7 @@ namespace jNet.RPC.Client
 
         public event EventHandler Disposed;
 
-        internal event EventHandler Finalized; 
+        internal event EventHandler Finalized;        
 
         protected T Get<T>([CallerMemberName] string propertyName = null)
         {
@@ -134,7 +163,7 @@ namespace jNet.RPC.Client
             }
         }
 
-        internal void OnEventNotificationMessage(SocketMessage message)
+        internal void OnNotificationMessage(SocketMessage message)
         {
             if (message.MemberName == nameof(INotifyPropertyChanged.PropertyChanged))
             {
@@ -162,6 +191,9 @@ namespace jNet.RPC.Client
                 }
                 NotifyPropertyChanged(eav.PropertyName);
             }
+            else if (message.MessageType == SocketMessage.SocketMessageType.ProxyFinalized)
+                FinalizeProxy();
+
             else OnEventNotification(message);
         }
 

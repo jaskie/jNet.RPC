@@ -105,8 +105,9 @@ namespace jNet.RPC
                 {
                     var serializedData = SerializeDto(message.Value);
                     _sendQueue.Enqueue(message.Encode(serializedData));
-                    //if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
-                    //    Logger.Debug("Message queued to send {0}:{1}", message.MessageGuid, message.MessageType);
+                    if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
+                        Logger.Debug("Message queued to send {0}:{1}:{2}", message.MessageGuid, message.DtoGuid, message.MessageType);
+                    
                     _sendAutoResetEvent.Set();
                     return;
                 }
@@ -217,8 +218,8 @@ namespace jNet.RPC
                         if (dataIndex != dataBuffer.Length)
                             continue;
                         var message = new SocketMessage(dataBuffer);
-                        //if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
-                        //    Logger.Debug("Message received {0}:{1}", message.MessageGuid, message.MessageType);
+                        if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
+                            Logger.Debug("Message received {0}:{1}", message.MessageGuid, message.MessageType);
                         EnqueueMessage(message);
                         dataBuffer = null;                                               
                     }
