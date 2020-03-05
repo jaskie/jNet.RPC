@@ -137,13 +137,15 @@ namespace jNet.RPC.Client
                 switch (message.MessageType)
                 {
                     case SocketMessage.SocketMessageType.ProxyFinalized:
+                        ((ClientReferenceResolver)ReferenceResolver).DeleteReference(message.DtoGuid);                        
+                        break;
+
                     case SocketMessage.SocketMessageType.EventNotification:
                         var notifyObject = ((ClientReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
                         if (notifyObject == null)
                             Logger.Debug("NotifyObject null: {0}:{1}", message.DtoGuid);
 
-                        notifyObject?.OnNotificationMessage(message);
-                        _messageHandledSemaphore.Release();
+                        notifyObject?.OnNotificationMessage(message);                        
                         break;
                                             
                     default:
@@ -154,10 +156,10 @@ namespace jNet.RPC.Client
                         }
 
                         request.Message = message;
-                        request.Semaphore.Release();
-                        _messageHandledSemaphore.Release();
+                        request.Semaphore.Release();                        
                         break;
                 }
+                _messageHandledSemaphore.Release();
             }
         }        
 

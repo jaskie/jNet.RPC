@@ -21,7 +21,7 @@ namespace jNet.RPC.Client
     public abstract class ProxyBase : IDto
     {
         private int _isDisposed;
-        private bool _hasFinalized;
+        private bool _isFinalized;
         private RemoteClient _client;
         private const int DisposedValue = 1;
         private static readonly ConcurrentDictionary<Guid, ProxyBase> _finalizeRequestedDtos = new ConcurrentDictionary<Guid, ProxyBase>();
@@ -34,14 +34,19 @@ namespace jNet.RPC.Client
         
         ~ProxyBase()
         {
-            if (!_hasFinalized) //first finalization will send request to server; on response hard reference would be deleted and object collected in next GC run
+            if (!_isFinalized) //first finalization will send request to server; on response hard reference would be deleted and object collected in next GC run
             {
-                _finalizeRequestedDtos.TryAdd(DtoGuid, this);
-                _hasFinalized = true;
+                _finalizeRequestedDtos.TryAdd(DtoGuid, this);               
                 GC.ReRegisterForFinalize(this);
-
-                Finalized?.Invoke(this, EventArgs.Empty);
-            }            
+                FinalizedChanged?.Invoke(this, EventArgs.Empty);
+                _isFinalized = true;
+            }
+            else
+            {
+                FinalizedChanged?.Invoke(this, EventArgs.Empty);
+                Debug.WriteLine($"Proxy {DtoGuid} finalized!");                
+            }
+                
         }
 
         public void FinalizeProxy()
@@ -57,10 +62,7 @@ namespace jNet.RPC.Client
             return proxy;
         }
 
-        public bool IsFinalizeRequested()
-        {
-            return _finalizeRequestedDtos.ContainsKey(DtoGuid);
-        }
+        public bool IsFinalized { get => _isFinalized; }
 
         public Guid DtoGuid { get; internal set; }
 
@@ -68,7 +70,7 @@ namespace jNet.RPC.Client
 
         public event EventHandler Disposed;
 
-        internal event EventHandler Finalized;        
+        internal event EventHandler FinalizedChanged;        
 
         protected T Get<T>([CallerMemberName] string propertyName = null)
         {
@@ -190,10 +192,7 @@ namespace jNet.RPC.Client
                     field.SetValue(this, value);
                 }
                 NotifyPropertyChanged(eav.PropertyName);
-            }
-            else if (message.MessageType == SocketMessage.SocketMessageType.ProxyFinalized)
-                FinalizeProxy();
-
+            }           
             else OnEventNotification(message);
         }
 
