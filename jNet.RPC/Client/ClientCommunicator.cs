@@ -143,7 +143,7 @@ namespace jNet.RPC.Client
                     case SocketMessage.SocketMessageType.EventNotification:
                         var notifyObject = ((ClientReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
                         if (notifyObject == null)
-                            Logger.Debug("NotifyObject null: {0}:{1}", message.DtoGuid);
+                            Logger.Debug("NotifyObject null: {0}:{1}", message.MessageGuid, message.DtoGuid);
 
                         notifyObject?.OnNotificationMessage(message);                        
                         break;

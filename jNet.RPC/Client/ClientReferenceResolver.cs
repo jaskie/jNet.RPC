@@ -28,32 +28,46 @@ namespace jNet.RPC.Client
                 return;
             var id = new Guid(reference);
             proxy.DtoGuid = id;
-            if (!_knownDtos.TryAdd(id, new WeakReference<ProxyBase>(proxy, true)))
-                Logger.Warn("Reference {0} already exists in knownDtos.", id);
+
+            if (_knownDtos.TryGetValue(id, out var wRef) && wRef.TryGetTarget(out var target))
+            {
+                _knownDtos[id] = new WeakReference<ProxyBase>(proxy, true);
+                proxy.Finalized += Proxy_FinalizedChanged;
+                proxy.Resurrected += Proxy_ResurrectedChanged;
+
+                target.Finalized -= Proxy_FinalizedChanged;
+                target.Resurrected -= Proxy_ResurrectedChanged;
+                target.FinalizeProxy();
+
+                Logger.Debug("AddReference updated {0} for {1}", reference, value);
+            }
+            else if (_knownDtos.TryAdd(id, new WeakReference<ProxyBase>(proxy, true)))
+            {
+                proxy.Finalized += Proxy_FinalizedChanged;
+                proxy.Resurrected += Proxy_ResurrectedChanged;
+                Logger.Debug("AddReference {0} for {1}", reference, value);
+            }
             
-            proxy.FinalizedChanged += Proxy_FinalizedChanged;
-            Logger.Debug("AddReference {0} for {1}", reference, value);
-        }
+            else
+                Logger.Warn("AddReference error {0}", id);
+        }        
 
         public string GetReference(object context, object value)
         {
             if (!(value is ProxyBase proxy)) 
                 return string.Empty;
-
-            return proxy.DtoGuid.ToString();
-
-            //if (IsReferenced(context, value))
-            //{
-            //    Logger.Debug("GetReference returning existsing dto. {0}", proxy.DtoGuid);
-            //    return proxy.DtoGuid.ToString();
-            //}
             
-            //_knownDtos[proxy.DtoGuid] = new WeakReference<ProxyBase>(proxy, true);
-            //Logger.Warn("GetReference added {0} for {1}", proxy.DtoGuid, value);
+            if (IsReferenced(context, value))
+            {
+                Logger.Debug("GetReference returning existsing dto. {0}", proxy.DtoGuid);
+                return proxy.DtoGuid.ToString();
+            }
 
-            //proxy.FinalizedChanged += Proxy_FinalizedChanged;
+            _knownDtos[proxy.DtoGuid] = new WeakReference<ProxyBase>(proxy, true);            
+            proxy.Finalized += Proxy_FinalizedChanged;
             
-            //return proxy.DtoGuid.ToString();
+            Logger.Warn("GetReference added {0} for {1}", proxy.DtoGuid, value);
+            return proxy.DtoGuid.ToString();                      
         }
 
 
@@ -61,70 +75,98 @@ namespace jNet.RPC.Client
         {
             if (!(value is IDto dto))
                 return false;
+            
+            if (ProxyBase.FinalizeRequested.TryGetValue(dto.DtoGuid, out var proxy))
+            {
+                proxy.Resurrect();               
+                return true;
+            }
 
-            return true;
+            else if (_knownDtos.TryGetValue(dto.DtoGuid, out var reference))
+            {
+                if (!reference.TryGetTarget(out _))
+                    Logger.Warn("Referenced found but failed to retrieve target! dto: {0}", dto.DtoGuid);
 
-            //if (_knownDtos.TryGetValue(dto.DtoGuid, out var reference))
-            //{
-            //    if (!reference.TryGetTarget(out _))
-            //        Logger.Warn("Referenced found but failed to retrieve target! dto: {0}", dto.DtoGuid);
+                return true;
+            }
 
-            //    return true;
-            //}
-
-            //return false;
+            return false;
         }
 
         public object ResolveReference(object context, string reference)
         {
             var id = new Guid(reference);
 
-            if (!_knownDtos.TryGetValue(id, out var value))
-                return UnreferencedObjectFinder(id).Result;
-
-            Logger.Trace("Resolved reference {0} with {1}", reference, value);
-            if (value.TryGetTarget(out var target))
+            if (_knownDtos.TryGetValue(id, out var value) && value.TryGetTarget(out var target))
+            {
+                Logger.Trace("Resolved reference {0} with {1}", reference, value);
+                //Debug.Assert(value == null);
                 return target;
-           
-            return UnreferencedObjectFinder(id).Result;
+            }
+
+            else if (ProxyBase.FinalizeRequested.TryGetValue(id, out target))
+            {
+                target.Resurrect();
+                return target;
+            }
+                  
+            else
+            {
+                Logger.Debug("Unknown reference: {0}", reference);
+            }
+                
+            return null;
         }
 
         #endregion //IReferenceResolver
 
-        internal event EventHandler<ProxyBaseEventArgs> ReferenceFinalized;
+        internal event EventHandler<ProxyBaseEventArgs> ReferenceFinalized;        
         internal Func<Guid, Task<ProxyBase>> UnreferencedObjectFinder;       
 
         internal ProxyBase ResolveReference(Guid reference)
         {
             if (_knownDtos.TryGetValue(reference, out var p) && p.TryGetTarget(out var target))
                 return target;
-            
+
+            //else if (ProxyBase.FinalizeRequested.TryGetValue(reference, out target))
+            //{
+            //    target.Resurrect();
+            //    return target;
+            //}
+
             return null;            
         }
 
         public void DeleteReference(Guid reference)
         {
-            if (_knownDtos.TryGetValue(reference, out var p) && p.TryGetTarget(out var proxy))
+            if (ProxyBase.FinalizeRequested.TryGetValue(reference, out var proxy))
             {
-                proxy.FinalizedChanged -= Proxy_FinalizedChanged;               
+                proxy.Finalized -= Proxy_FinalizedChanged;
+                proxy.Resurrected -= Proxy_ResurrectedChanged;
                 proxy.FinalizeProxy();                
                 return;
             }
-            Logger.Warn("Could not finalize proxy {0}", reference.ToString());
+            Logger.Warn("Could not finalize resurrected proxy {0}", reference.ToString());
+        }
+
+        private void Proxy_ResurrectedChanged(object sender, EventArgs e)
+        {
+            if (!(sender is ProxyBase proxy))
+                return;
+
+            if (!_knownDtos.TryAdd(proxy.DtoGuid, new WeakReference<ProxyBase>(proxy)))
+                Logger.Debug("Could not restore to knownDto list {0}", proxy.DtoGuid);            
+
+            Logger.Debug("Proxy resurrected {0}", proxy.DtoGuid);
         }
 
         private void Proxy_FinalizedChanged(object sender, EventArgs e)
         {            
             if (!(sender is ProxyBase proxy))
                 return;
-
-            if (proxy.IsFinalized)
-            {
-                _knownDtos.TryRemove(proxy.DtoGuid, out _);
-                Logger.Debug("KnowDtosDeleted {0}", proxy.DtoGuid);
-            }
-            else
-                ReferenceFinalized?.Invoke(this, new ProxyBaseEventArgs(proxy));                       
+            Logger.Debug("Deleting from knowndtos {0}", proxy.DtoGuid);
+            _knownDtos.TryRemove(proxy.DtoGuid, out _);
+            ReferenceFinalized?.Invoke(this, new ProxyBaseEventArgs(proxy));                       
         }
 
     }

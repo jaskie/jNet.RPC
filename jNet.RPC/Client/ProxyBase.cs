@@ -21,10 +21,9 @@ namespace jNet.RPC.Client
     public abstract class ProxyBase : IDto
     {
         private int _isDisposed;
-        private bool _isFinalized;
+        private bool _finalizeRequested;
         private RemoteClient _client;
-        private const int DisposedValue = 1;
-        private static readonly ConcurrentDictionary<Guid, ProxyBase> _finalizeRequestedDtos = new ConcurrentDictionary<Guid, ProxyBase>();
+        private const int DisposedValue = 1;        
        
         public void Dispose()
         {
@@ -34,43 +33,50 @@ namespace jNet.RPC.Client
         
         ~ProxyBase()
         {
-            if (!_isFinalized) //first finalization will send request to server; on response hard reference would be deleted and object collected in next GC run
+            if (!_finalizeRequested) //first finalization will send request to server; on response hard reference would be deleted and object collected in next GC run
             {
-                _finalizeRequestedDtos.TryAdd(DtoGuid, this);               
+                if (!FinalizeRequested.TryAdd(DtoGuid, this))
+                    Debug.WriteLine($"Could not save object! {DtoGuid}");
+                else
+                    Debug.WriteLine($"Saving object! {DtoGuid}");
+                Finalized?.Invoke(this, EventArgs.Empty);
+                _finalizeRequested = true;
                 GC.ReRegisterForFinalize(this);
-                FinalizedChanged?.Invoke(this, EventArgs.Empty);
-                _isFinalized = true;
             }
             else
-            {
-                FinalizedChanged?.Invoke(this, EventArgs.Empty);
-                Debug.WriteLine($"Proxy {DtoGuid} finalized!");                
-            }
-                
+            {                
+                Debug.WriteLine($"Proxy {DtoGuid} finalized!");                 
+            }                
+        }
+
+        public void Resurrect()
+        {                        
+            FinalizeRequested.TryRemove(DtoGuid, out _);
+            _finalizeRequested = false;
+            Debug.WriteLine($"Trying to resurrect {DtoGuid}");
+            Resurrected?.Invoke(this, EventArgs.Empty);            
         }
 
         public void FinalizeProxy()
         {
-            Debug.WriteLine("Proxy removed from finalizedDict {0}", DtoGuid);
-            _finalizeRequestedDtos.TryRemove(DtoGuid, out _);
-            Debug.WriteLine(_finalizeRequestedDtos.Count);
+            _finalizeRequested = true;
+            FinalizeRequested.TryRemove(DtoGuid, out _);            
+            Debug.WriteLine("Proxy strong reference delete {0}", DtoGuid);
+            Debug.WriteLine(FinalizeRequested.Count);
         }
+        
+        public bool IsFinalized { get => _finalizeRequested; }
 
-        public static ProxyBase GetFinalizeRequestedProxy(Guid guid)
-        {
-            _finalizeRequestedDtos.TryGetValue(guid, out var proxy);
-            return proxy;
-        }
+        public static readonly ConcurrentDictionary<Guid, ProxyBase> FinalizeRequested = new ConcurrentDictionary<Guid, ProxyBase>();
 
-        public bool IsFinalized { get => _isFinalized; }
-
-        public Guid DtoGuid { get; internal set; }
+        public Guid DtoGuid { get; internal set; }        
 
         public event PropertyChangedEventHandler PropertyChanged;
 
         public event EventHandler Disposed;
+        public event EventHandler Resurrected;
 
-        internal event EventHandler FinalizedChanged;        
+        internal event EventHandler Finalized;        
 
         protected T Get<T>([CallerMemberName] string propertyName = null)
         {
