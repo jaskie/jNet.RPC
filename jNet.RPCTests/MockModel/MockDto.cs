@@ -2,16 +2,17 @@
 
 namespace jNet.RPCTests.MockModel
 {
-    public class MockObject : DtoBase
+    public class MockDto : DtoBase, IMockObject
     {
+        [JsonProperty()]
         public string Value { get; }
 
-        public MockObject()
+        public MockDto()
         {
 
         }
 
-        public MockObject(string value)
+        public MockDto(string value)
         {
             Value = value;
         }
