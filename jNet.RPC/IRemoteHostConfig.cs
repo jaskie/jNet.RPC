@@ -5,6 +5,6 @@ namespace jNet.RPC
     public interface IRemoteHostConfig
     {
         [XmlAttribute]
-        ushort ListenPort { get; set; }
+        ushort ListenPort { get; }
     }
 }
