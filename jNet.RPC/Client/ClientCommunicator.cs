@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -17,8 +18,14 @@ namespace jNet.RPC.Client
         public ClientCommunicator() : base(new ClientReferenceResolver())
         {
             ((ClientReferenceResolver)ReferenceResolver).ReferenceFinalized += Resolver_ReferenceFinalized;
-            ((ClientReferenceResolver)ReferenceResolver).UnreferencedObjectFinder = UnreferencedObjectFinder;                                   
+            //((ClientReferenceResolver)ReferenceResolver).PopulateObject += ClientCommunicator_PopulateObject;            
         }
+
+        //private void ClientCommunicator_PopulateObject(object sender, ProxyBaseEventArgs e)
+        //{
+        //    var target = ((ClientReferenceResolver)ReferenceResolver).ResolveReference(e.Proxy.DtoGuid);
+            
+        //}
 
         protected override void OnDispose()
         {
@@ -37,17 +44,17 @@ namespace jNet.RPC.Client
                 null));            
         }
 
-        private async Task<ProxyBase> UnreferencedObjectFinder(Guid guid)
-        {            
-            var proxy = await SendAndGetResponse<ProxyBase>(new SocketMessage((object)null)
-            {
-                MessageType = SocketMessage.SocketMessageType.UnresolvedReference,
-                DtoGuid = guid
-            }).ConfigureAwait(false);
+        //private async Task<ProxyBase> UnreferencedObjectFinder(Guid guid)
+        //{            
+        //    var proxy = await SendAndGetResponse<ProxyBase>(new SocketMessage((object)null)
+        //    {
+        //        MessageType = SocketMessage.SocketMessageType.UnresolvedReference,
+        //        DtoGuid = guid
+        //    }).ConfigureAwait(false);
 
-            Logger.Trace("Unresolved reference restored: {0}:{1}", guid, proxy);
-            return proxy;
-        }
+        //    Logger.Trace("Unresolved reference restored: {0}:{1}", guid, proxy);
+        //    return proxy;
+        //}
 
         protected override void EnqueueMessage(SocketMessage message)
         {
@@ -100,7 +107,7 @@ namespace jNet.RPC.Client
                 if (response.Message.MessageType == SocketMessage.SocketMessageType.Exception)
                     throw Deserialize<Exception>(response.Message);
 
-                var result = Deserialize<T>(response.Message);
+                var result = Deserialize<T>(response.Message);                
                 return result;
             }
             return default(T);
@@ -132,7 +139,7 @@ namespace jNet.RPC.Client
                     break;
 
                 if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
-                    Logger.Debug("Processing message: {0}:{1}", message.MessageGuid, message.DtoGuid);
+                    Logger.Debug("Processing message: {0}:{1}:{2}:{3}", message.MessageGuid, message.DtoGuid, message.MemberName, message.ValueString);
 
                 switch (message.MessageType)
                 {
@@ -169,8 +176,35 @@ namespace jNet.RPC.Client
             {
                 if (valueStream == null)
                     return default(T);
+             
                 using (var reader = new StreamReader(valueStream))
-                    return (T)Serializer.Deserialize(reader, typeof(T));
+                {
+                    var obj = (T)Serializer.Deserialize(reader, typeof(T));
+                    if (obj is ProxyBase target)
+                    {
+                        var source = ((ClientReferenceResolver)ReferenceResolver).ProxiesToPopulate.FirstOrDefault(p => p.DtoGuid == target.DtoGuid);
+                        if (source == null)
+                            return obj;
+                        try
+                        {
+                            valueStream.Position = 0;
+                            Serializer.Populate(reader, target);
+                        }
+                        catch(Exception ex)
+                        {
+                            Logger.Error(ex, "Error when populating {0}:{1}", source.DtoGuid, target.DtoGuid);
+                        }
+                        finally
+                        {
+                            ((ClientReferenceResolver)ReferenceResolver).ProxiesToPopulate.Remove(source);
+                        }                        
+                    }
+                    if (obj == null && message.MemberName.Contains("GetSucc"))
+                        Logger.Debug("NULL ON DESERIALIZE! {0}", message.DtoGuid);
+
+                    return obj;                    
+                }
+                    
             }
         }
     }

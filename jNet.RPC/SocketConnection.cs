@@ -266,6 +266,5 @@ namespace jNet.RPC
                 return (T)Serializer.Deserialize(reader, typeof(T));
             }
         }
-
     }
 }

@@ -59,8 +59,8 @@ namespace jNet.RPC.Client
 
         public void FinalizeProxy()
         {
-            _finalizeRequested = true;
-            FinalizeRequested.TryRemove(DtoGuid, out _);            
+            FinalizeRequested.TryRemove(DtoGuid, out var temp);
+            _finalizeRequested = true;            
             Debug.WriteLine("Proxy strong reference delete {0}", DtoGuid);
             Debug.WriteLine(FinalizeRequested.Count);
         }
