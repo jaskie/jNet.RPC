@@ -43,8 +43,10 @@ namespace jNet.RPC.Server
         {
             if (!(value is DtoBase dto)) return 
                     string.Empty;
+
             if (IsReferenced(context, value))
                 return dto.DtoGuid.ToString();
+
             dto.PropertyChanged += Dto_PropertyChanged;
             _knownDtos[dto.DtoGuid] = dto;
             Logger.Trace("GetReference added {0} for {1}", dto.DtoGuid, value);
@@ -64,8 +66,12 @@ namespace jNet.RPC.Server
             var id = new Guid(reference);
             if (!_knownDtos.TryGetValue(id, out var value))
             {
-                var dto = DtoBase.FindDto(id);              
-                Logger.Warn("Returning hard DTO (not found in known dtos)! {0}", dto.DtoGuid);
+                var dto = DtoBase.FindDto(id);
+                if (dto == null)
+                    return null;
+
+                _knownDtos[id] = value;                
+                Logger.Warn("Reference not found in knownDtos, but found locally - adding to known. {0}", dto.DtoGuid);
                 return dto;
             }
                 

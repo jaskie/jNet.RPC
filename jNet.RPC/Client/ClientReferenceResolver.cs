@@ -30,7 +30,7 @@ namespace jNet.RPC.Client
             var id = new Guid(reference);
             proxy.DtoGuid = id;
 
-            lock(_knownDtos)
+            lock(ProxyBase.Sync)
             {                
                 if (!_knownDtos.ContainsKey(id))
                 {
@@ -85,7 +85,7 @@ namespace jNet.RPC.Client
         {
             var id = new Guid(reference);
 
-            lock(_knownDtos)
+            lock(ProxyBase.Sync)
             {
                 if (_knownDtos.TryGetValue(id, out var value))
                 {
@@ -122,7 +122,7 @@ namespace jNet.RPC.Client
 
         internal ProxyBase ResolveReference(Guid reference)
         {
-            lock(_knownDtos)
+            lock(ProxyBase.Sync)
             {
                 if (_knownDtos.TryGetValue(reference, out var p) && p.TryGetTarget(out var target))
                     return target;
@@ -135,14 +135,17 @@ namespace jNet.RPC.Client
 
         public void DeleteReference(Guid reference)
         {
-            if (ProxyBase.FinalizeRequested.TryGetValue(reference, out var proxy))
+            lock(ProxyBase.Sync)
             {
-                proxy.Finalized -= Proxy_FinalizedChanged;
-                proxy.Resurrected -= Proxy_ResurrectedChanged;
-                proxy.FinalizeProxy();                
-                return;
-            }
-            Logger.Warn("Could not finalize resurrected proxy {0}", reference.ToString());
+                if (ProxyBase.FinalizeRequested.TryGetValue(reference, out var proxy))
+                {
+                    proxy.Finalized -= Proxy_FinalizedChanged;
+                    proxy.Resurrected -= Proxy_ResurrectedChanged;
+                    proxy.FinalizeProxy();
+                    return;
+                }
+                Logger.Warn("Could not finalize resurrected proxy {0}", reference.ToString());
+            }            
         }
 
         private void Proxy_ResurrectedChanged(object sender, EventArgs e)
@@ -151,8 +154,11 @@ namespace jNet.RPC.Client
                 return;
 
             try
-            {                
-                _knownDtos.Add(proxy.DtoGuid, new WeakReference<ProxyBase>(proxy, true));
+            {    
+                lock(ProxyBase.Sync)
+                {
+                    _knownDtos.Add(proxy.DtoGuid, new WeakReference<ProxyBase>(proxy, true));
+                }                
             }
             catch
             {
@@ -168,7 +174,7 @@ namespace jNet.RPC.Client
             if (!(sender is ProxyBase proxy))
                 return;
 
-            lock(_knownDtos)
+            lock(ProxyBase.Sync)
             {
                 Logger.Debug("Deleting from knowndtos {0}", proxy.DtoGuid);
                 _knownDtos.Remove(proxy.DtoGuid);

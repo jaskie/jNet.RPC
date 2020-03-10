@@ -23,8 +23,8 @@ namespace jNet.RPC.Client
         private int _isDisposed;
         private bool _finalizeRequested;
         private RemoteClient _client;
-        private const int DisposedValue = 1;        
-       
+        private const int DisposedValue = 1;
+        public static readonly object Sync = new object();
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _isDisposed, DisposedValue) == default(int))
@@ -35,13 +35,17 @@ namespace jNet.RPC.Client
         {
             if (!_finalizeRequested) //first finalization will send request to server; on response hard reference would be deleted and object collected in next GC run
             {
-                if (!FinalizeRequested.TryAdd(DtoGuid, this))
-                    Debug.WriteLine($"Could not save object! {DtoGuid}");
-                else
-                    Debug.WriteLine($"Saving object! {DtoGuid}");
-                Finalized?.Invoke(this, EventArgs.Empty);
-                _finalizeRequested = true;
-                GC.ReRegisterForFinalize(this);
+                lock(Sync)
+                {
+                    if (!FinalizeRequested.TryAdd(DtoGuid, this))
+                        Debug.WriteLine($"Could not save object! {DtoGuid}");
+                    else
+                        Debug.WriteLine($"Saving object! {DtoGuid}");
+                    Finalized?.Invoke(this, EventArgs.Empty);
+                    _finalizeRequested = true;
+                    GC.ReRegisterForFinalize(this);
+                }
+                
             }
             else
             {                
