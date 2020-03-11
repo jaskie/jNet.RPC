@@ -21,13 +21,8 @@ namespace jNet.RPC.Server
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         
         [XmlAttribute]
-        public ushort ListenPort { get; }
-
-        public ServerHost(ushort listenPort)
-        {
-            ListenPort = listenPort;
-        }
-
+        public ushort ListenPort { get; set; }        
+        
         public bool Initialize(DtoBase rootDto, IPrincipalProvider principalProvider)
         {
             if (ListenPort < 1024)

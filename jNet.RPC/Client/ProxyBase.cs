@@ -9,10 +9,8 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Threading;
-using Microsoft.Win32.SafeHandles;
 using Newtonsoft.Json;
 
 namespace jNet.RPC.Client

@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Threading;
@@ -9,7 +9,8 @@ namespace jNet.RPC.Server
 {
     internal class ServerReferenceResolver : IReferenceResolver, IDisposable
     {
-        private readonly ConcurrentDictionary<Guid, DtoBase> _knownDtos = new ConcurrentDictionary<Guid, DtoBase>();
+        private readonly Dictionary<Guid, DtoBase> _knownDtos = new Dictionary<Guid, DtoBase>();        
+        public static readonly object Sync = new object();
         private int _disposed;
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
@@ -24,13 +25,18 @@ namespace jNet.RPC.Server
         {
             if (Interlocked.Exchange(ref _disposed, 1) != default(int))
                 return;
-            var allKeys = _knownDtos.Keys;
-            foreach (var key in allKeys)
+
+            lock(Sync)
             {
-                if (!_knownDtos.TryRemove(key, out var removed))
-                    continue;
-                removed.PropertyChanged -= Dto_PropertyChanged;
-            }
+                var allKeys = _knownDtos.Keys;
+                foreach (var key in allKeys)
+                {
+                    if (!_knownDtos.TryGetValue(key, out var removed))
+                        continue;
+                    removed.PropertyChanged -= Dto_PropertyChanged;
+                    _knownDtos.Remove(key);
+                }
+            }            
         }
 
         #region IReferenceResolver
@@ -41,52 +47,65 @@ namespace jNet.RPC.Server
 
         public string GetReference(object context, object value)
         {
-            if (!(value is DtoBase dto)) return 
-                    string.Empty;
+            if (!(value is DtoBase dto)) 
+                return string.Empty;
 
-            if (IsReferenced(context, value))
+            lock(Sync)
+            {
+                if (IsReferenced(context, value))
+                    return dto.DtoGuid.ToString();
+
+                dto.PropertyChanged += Dto_PropertyChanged;
+                _knownDtos[dto.DtoGuid] = dto;
+                Logger.Trace("GetReference added {0} for {1}", dto.DtoGuid, value);
                 return dto.DtoGuid.ToString();
-
-            dto.PropertyChanged += Dto_PropertyChanged;
-            _knownDtos[dto.DtoGuid] = dto;
-            Logger.Trace("GetReference added {0} for {1}", dto.DtoGuid, value);
-            return dto.DtoGuid.ToString();
+            }            
         }
 
 
         public bool IsReferenced(object context, object value)
         {
-            if (value is IDto p && !p.DtoGuid.Equals(Guid.Empty))
-                return _knownDtos.ContainsKey(p.DtoGuid);
-            return false;
+            lock(Sync)
+            {
+                if (value is IDto p && !p.DtoGuid.Equals(Guid.Empty))
+                    return _knownDtos.ContainsKey(p.DtoGuid);
+                return false;
+            }            
         }
 
         public object ResolveReference(object context, string reference)
         {
             var id = new Guid(reference);
-            if (!_knownDtos.TryGetValue(id, out var value))
+            lock(Sync)
             {
-                var dto = DtoBase.FindDto(id);
-                if (dto == null)
-                    return null;
+                if (!_knownDtos.TryGetValue(id, out var value))
+                {
+                    var dto = DtoBase.FindDto(id);
+                    if (dto == null)
+                        return null;
 
-                _knownDtos[id] = value;                
-                Logger.Warn("Reference not found in knownDtos, but found locally - adding to known. {0}", dto.DtoGuid);
-                return dto;
+                    _knownDtos[id] = value;
+                    Logger.Warn("Reference not found in knownDtos, but found locally - adding to known. {0}", dto.DtoGuid);
+                    return dto;
+                }
+
+                Logger.Trace("ResolveReference {0} with {1}", reference, value);
+                return value;
             }
-                
-            Logger.Trace("ResolveReference {0} with {1}", reference, value);
-            return value;
+            
         }
 
         #endregion //IReferenceResolver
 
         public DtoBase ResolveReference(Guid reference)
         {
-            if (!_knownDtos.TryGetValue(reference, out var p))            
-                return DtoBase.FindDto(reference);                             
-                                                                       
-            return p;
+            lock (Sync)
+            {
+                if (!_knownDtos.TryGetValue(reference, out var p))
+                    return DtoBase.FindDto(reference);
+
+                return p;
+            }
         }
 
         internal event EventHandler<WrappedEventArgs> ReferencePropertyChanged;
@@ -101,8 +120,14 @@ namespace jNet.RPC.Server
 
         public void RemoveReference(IDto dto)
         {
-            if (_knownDtos.TryRemove(dto.DtoGuid, out var removed))
+            lock(Sync)
+            {
+                if (!_knownDtos.TryGetValue(dto.DtoGuid, out var removed))
+                    return;
+
                 removed.PropertyChanged -= Dto_PropertyChanged;
+                _knownDtos.Remove(dto.DtoGuid);
+            }                            
         }
     }
 

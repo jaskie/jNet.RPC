@@ -16,10 +16,8 @@ namespace jNet.RPC
             EventAdd,
             EventRemove,
             EventNotification,
-            ProxyFinalized,
-            UnresolvedReference,
-            Exception,
-            UnresolvedReferenceServer
+            ProxyFinalized,            
+            Exception,            
         }
 
         private static readonly byte[] Version = { 0x1, 0x0,

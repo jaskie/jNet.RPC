@@ -61,24 +61,7 @@ namespace jNet.RPC.Client
             if (!(value is IDto dto))
                 return false;
             
-            return true;
-            //lock (_knownDtos)
-            //{
-            //    if (ProxyBase.FinalizeRequested.TryGetValue(dto.DtoGuid, out var proxy))
-            //    {
-            //        proxy.Resurrect();
-            //        return true;
-            //    }
-
-            //    else if (_knownDtos.TryGetValue(dto.DtoGuid, out var reference))
-            //    {
-            //        if (!reference.TryGetTarget(out _))
-            //            Logger.Warn("Referenced found but failed to retrieve target! dto: {0}", dto.DtoGuid);
-
-            //        return true;
-            //    }
-            //    return false;
-            //}
+            return true;            
         }
 
         public object ResolveReference(object context, string reference)
@@ -97,7 +80,11 @@ namespace jNet.RPC.Client
                             target.Resurrect();
                         }
                     }
-                    Logger.Trace("Resolved reference {0} with {1}", reference, value);                   
+                    Logger.Trace("Resolved reference {0} with {1}", reference, value);
+
+                    if (target == null)
+                        Logger.Debug("NULL ON TARGET! {0}", reference);
+
                     return target;
                 }
 

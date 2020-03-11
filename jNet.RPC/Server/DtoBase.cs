@@ -15,12 +15,13 @@ namespace jNet.RPC.Server
     [JsonObject(ItemTypeNameHandling = TypeNameHandling.Objects, IsReference = true, MemberSerialization = MemberSerialization.OptIn)]
     public abstract class DtoBase: IDto
     {
-        private static readonly ConcurrentDictionary<Guid, WeakReference<DtoBase>> AllDtos = new ConcurrentDictionary<Guid, WeakReference<DtoBase>>();
+        private static readonly ConcurrentDictionary<Guid, WeakReference<DtoBase>> AllDtos = new ConcurrentDictionary<Guid, WeakReference<DtoBase>>();        
 
         internal static DtoBase FindDto(Guid guid)
         {
             if (AllDtos.TryGetValue(guid, out var reference) && reference.TryGetTarget(out var result))
                 return result;
+
             return null;
         }
 

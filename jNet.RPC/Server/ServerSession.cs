@@ -98,20 +98,7 @@ namespace jNet.RPC.Server
                     if (message.MessageType == SocketMessage.SocketMessageType.RootQuery)
                     {
                         SendResponse(message, _initialObject);
-                    }
-                    else if (message.MessageType == SocketMessage.SocketMessageType.UnresolvedReference)
-                    {
-                        var dto = DtoBase.FindDto(message.DtoGuid);
-                        if (dto == null)
-                        {
-                            var endMessage = new SocketMessage(message, null);
-                            endMessage.MessageType = SocketMessage.SocketMessageType.UnresolvedReferenceServer;
-                            SendResponse(endMessage, null);
-                        }
-
-                        ((ServerReferenceResolver)ReferenceResolver).RemoveReference(dto);
-                        SendResponse(message, dto);
-                    }
+                    }                    
                     else // method of particular object
                     {
                         var objectToInvoke = ((ServerReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
@@ -209,13 +196,11 @@ namespace jNet.RPC.Server
                                     SendResponse(message, null);
                                     break;
                             }
-                        }
+                        }                        
                         else
                         {
-                            var endMessage = new SocketMessage(message, null);
-                            endMessage.MessageType = SocketMessage.SocketMessageType.UnresolvedReferenceServer;
-                            SendResponse(endMessage, null);
-                            Debug.WriteLine($"Server: unknown DTO: {message.DtoGuid} on {message}");
+                            Logger.Debug("Dto send by client not found! {0}", message.DtoGuid);
+                            SendResponse(message, null);
                         }
                     }
                 }
