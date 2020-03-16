@@ -55,7 +55,7 @@ namespace jNet.RPCTests.Client
         }
 
         [TestMethod]
-        public void AddReference_Existing_AddToKnown()
+        public void AddReference_Existing_Populate()
         {
             ClientReferenceResolver clientReferenceResolver = new ClientReferenceResolver();            
             PrivateObject po = new PrivateObject(clientReferenceResolver);

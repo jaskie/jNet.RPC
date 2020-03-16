@@ -60,6 +60,7 @@
   </Choose>
   <ItemGroup>
     <Compile Include="Client\ClientReferenceResolverTest.cs" />
+    <Compile Include="Client\ProxyBaseTest.cs" />
     <Compile Include="MockCommunication\MockClient.cs" />
     <Compile Include="MockModel\IMockObject.cs" />
     <Compile Include="MockModel\MockDto.cs" />

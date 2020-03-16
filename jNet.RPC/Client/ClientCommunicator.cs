@@ -35,7 +35,16 @@ namespace jNet.RPC.Client
                 string.Empty,
                 0,
                 null));            
-        }       
+        }
+        private void Resolver_ReferenceResurrected(object sender, ProxyBaseEventArgs e)
+        {
+            Send(SocketMessage.Create(
+                SocketMessage.SocketMessageType.ProxyResurrected,
+                e.Proxy,
+                string.Empty,
+                0,
+                null));
+        }
 
         protected override void EnqueueMessage(SocketMessage message)
         {

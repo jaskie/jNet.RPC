@@ -108,6 +108,28 @@ namespace jNet.RPC.Server
             }
         }
 
+        public bool RestoreReference(IDto messageDto)
+        {
+            lock(Sync)
+            {
+                var dto = DtoBase.FindDto(messageDto.DtoGuid);
+                if (dto == null)
+                {
+                    Logger.Warn("Could not restore Dto (null on server side)! {0}", dto.DtoGuid);
+                    return false;
+                }
+                if (_knownDtos.ContainsKey(dto.DtoGuid))
+                {
+                    Logger.Warn("Server already knows about this dto, nothing to restore. {0}", dto.DtoGuid);
+                    return false;
+                }
+                _knownDtos.Add(dto.DtoGuid, dto);
+                Logger.Debug("Object ressurection acknowledged {0}", dto.DtoGuid);
+            }
+            
+            return true;
+        }
+
         internal event EventHandler<WrappedEventArgs> ReferencePropertyChanged;
 
         private void Dto_PropertyChanged(object sender, PropertyChangedEventArgs e)

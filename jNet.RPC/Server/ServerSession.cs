@@ -195,6 +195,9 @@ namespace jNet.RPC.Server
                                     RemoveReference(objectToInvoke);
                                     SendResponse(message, null);
                                     break;
+                                case SocketMessage.SocketMessageType.ProxyResurrected:
+                                    ((ServerReferenceResolver)ReferenceResolver).RestoreReference(objectToInvoke);
+                                    break;
                             }
                         }                        
                         else
@@ -280,8 +283,7 @@ namespace jNet.RPC.Server
         }
 
         private void NotifyClient(IDto dto, EventArgs e, string eventName)
-        {
-            //Debug.Assert(_referenceResolver.ResolveReference(dto.DtoGuid) != null, "Null reference notified");
+        {            
             try
             {
                 if (e is WrappedEventArgs ea
