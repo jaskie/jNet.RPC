@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using Newtonsoft.Json.Serialization;
 
@@ -27,9 +28,8 @@ namespace jNet.RPC.Server
                 return;
 
             lock(Sync)
-            {
-                var allKeys = _knownDtos.Keys;
-                foreach (var key in allKeys)
+            {                
+                foreach (var key in _knownDtos.Keys.ToList())
                 {
                     if (!_knownDtos.TryGetValue(key, out var removed))
                         continue;
@@ -84,7 +84,7 @@ namespace jNet.RPC.Server
                     if (dto == null)
                         return null;
 
-                    _knownDtos[id] = value;
+                    //_knownDtos[id] = value;
                     Logger.Warn("Reference not found in knownDtos, but found locally - adding to known. {0}", dto.DtoGuid);
                     return dto;
                 }
