@@ -16,7 +16,8 @@ namespace jNet.RPC
             EventAdd,
             EventRemove,
             EventNotification,
-            ProxyFinalized,            
+            ProxyFinalized,       
+            ProxyResurrected,
             Exception,            
         }
 

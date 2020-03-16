@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using jNet.RPC.Client;
 using jNet.RPC.Server;
 using jNet.RPCTests.MockModel;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -17,9 +15,9 @@ namespace jNet.RPCTests.Server
         {
             var serverReferenceResolver = new ServerReferenceResolver();
             PrivateObject po = new PrivateObject(serverReferenceResolver);
-            var _knownDtos = ((ConcurrentDictionary<Guid, DtoBase>)po.GetField("_knownDtos"));
+            var _knownDtos = ((Dictionary<Guid, DtoBase>)po.GetField("_knownDtos"));
             var mockObject = new MockDto("TestValue");
-            _knownDtos.TryAdd(mockObject.DtoGuid, mockObject);
+            _knownDtos.Add(mockObject.DtoGuid, mockObject);
 
             var _knownDtosCount = _knownDtos.Count;
 
@@ -45,7 +43,7 @@ namespace jNet.RPCTests.Server
             var serverReferenceResolver = new ServerReferenceResolver();
             PrivateObject po = new PrivateObject(serverReferenceResolver);
             var mockObject = new MockDto("TestValue");
-            var _knownDtos = ((ConcurrentDictionary<Guid, DtoBase>)po.GetField("_knownDtos"));
+            var _knownDtos = ((Dictionary<Guid, DtoBase>)po.GetField("_knownDtos"));
 
 
             var _knownDtosCount = _knownDtos.Count;
@@ -86,7 +84,7 @@ namespace jNet.RPCTests.Server
 
         #region ResolveReference
         [TestMethod]
-        public void ResolveReferenceTest_UnknownGuid_ReturnDto()
+        public void ResolveReferenceTest_UnknownGuid_ReturnNull()
         {
             var serverReferenceResolver = new ServerReferenceResolver();            
             
@@ -101,8 +99,8 @@ namespace jNet.RPCTests.Server
             var serverReferenceResolver = new ServerReferenceResolver();
             PrivateObject po = new PrivateObject(serverReferenceResolver);
             var mockObject = new MockDto("TestValue");
-            var _knownDtos = ((ConcurrentDictionary<Guid, DtoBase>)po.GetField("_knownDtos"));
-            _knownDtos.TryAdd(mockObject.DtoGuid, mockObject);
+            var _knownDtos = ((Dictionary<Guid, DtoBase>)po.GetField("_knownDtos"));
+            _knownDtos.Add(mockObject.DtoGuid, mockObject);
 
             var _knownDtosCount = _knownDtos.Count;
 
@@ -119,7 +117,7 @@ namespace jNet.RPCTests.Server
             var serverReferenceResolver = new ServerReferenceResolver();
             PrivateObject po = new PrivateObject(serverReferenceResolver);
             var mockObject = new MockDto("TestValue");
-            var _knownDtos = ((ConcurrentDictionary<Guid, DtoBase>)po.GetField("_knownDtos"));
+            var _knownDtos = ((Dictionary<Guid, DtoBase>)po.GetField("_knownDtos"));
 
             var _knownDtosCount = _knownDtos.Count;
 

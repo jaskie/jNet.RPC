@@ -105,7 +105,8 @@ namespace jNet.RPC.Client
 
         #endregion //IReferenceResolver
 
-        internal event EventHandler<ProxyBaseEventArgs> ReferenceFinalized;    
+        internal event EventHandler<ProxyBaseEventArgs> ReferenceFinalized;
+        internal event EventHandler<ProxyBaseEventArgs> ReferenceResurrected;
 
         internal ProxyBase ResolveReference(Guid reference)
         {
@@ -145,6 +146,7 @@ namespace jNet.RPC.Client
                 lock(ProxyBase.Sync)
                 {
                     _knownDtos.Add(proxy.DtoGuid, new WeakReference<ProxyBase>(proxy, true));
+                    ReferenceResurrected?.Invoke(this, new ProxyBaseEventArgs(proxy));
                 }                
             }
             catch
