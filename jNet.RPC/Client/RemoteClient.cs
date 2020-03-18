@@ -24,7 +24,7 @@ namespace jNet.RPC.Client
             }
         }
 
-        public T Query<T>(ProxyBase dto, string methodName, params object[] parameters)
+        public T Query<T>(ProxyObjectBase dto, string methodName, params object[] parameters)
         {
             try
             {
@@ -43,7 +43,7 @@ namespace jNet.RPC.Client
             }
         }
 
-        public T Get<T>(ProxyBase dto, string propertyName)
+        public T Get<T>(ProxyObjectBase dto, string propertyName)
         {
             try
             {
@@ -63,7 +63,7 @@ namespace jNet.RPC.Client
             }
         }
 
-        public void Invoke(ProxyBase dto, string methodName, params object[] parameters)
+        public void Invoke(ProxyObjectBase dto, string methodName, params object[] parameters)
         {
             try
             {
@@ -82,7 +82,7 @@ namespace jNet.RPC.Client
             }
         }
 
-        public void Set(ProxyBase dto, object value, string propertyName)
+        public void Set(ProxyObjectBase dto, object value, string propertyName)
         {
             try
             {
@@ -101,7 +101,7 @@ namespace jNet.RPC.Client
             }
         }
 
-        public void EventAdd(ProxyBase dto, string eventName)
+        public void EventAdd(ProxyObjectBase dto, string eventName)
         {
             try
             {
@@ -120,7 +120,7 @@ namespace jNet.RPC.Client
             }
         }
 
-        public void EventRemove(ProxyBase dto, string eventName)
+        public void EventRemove(ProxyObjectBase dto, string eventName)
         {
             try
             {

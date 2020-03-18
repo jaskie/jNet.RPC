@@ -27,7 +27,7 @@ namespace jNet.RPC.Client
             base.OnDispose();
         }
 
-        private void Resolver_ReferenceFinalized(object sender, ProxyBaseEventArgs e)
+        private void Resolver_ReferenceFinalized(object sender, ProxyObjectBaseEventArgs e)
         {
             Send(SocketMessage.Create(
                 SocketMessage.SocketMessageType.ProxyFinalized,
@@ -36,7 +36,7 @@ namespace jNet.RPC.Client
                 0,
                 null));            
         }
-        private void Resolver_ReferenceResurrected(object sender, ProxyBaseEventArgs e)
+        private void Resolver_ReferenceResurrected(object sender, ProxyObjectBaseEventArgs e)
         {
             Send(SocketMessage.Create(
                 SocketMessage.SocketMessageType.ProxyResurrected,
@@ -165,7 +165,7 @@ namespace jNet.RPC.Client
                 using (var reader = new StreamReader(valueStream))
                 {
                     var obj = (T)Serializer.Deserialize(reader, typeof(T));
-                    if (obj is ProxyBase target)
+                    if (obj is ProxyObjectBase target)
                     {
                         var source = ((ClientReferenceResolver)ReferenceResolver).ProxiesToPopulate.FirstOrDefault(p => p.DtoGuid == target.DtoGuid);
                         if (source == null)

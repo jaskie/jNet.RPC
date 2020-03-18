@@ -23,7 +23,7 @@ namespace jNet.RPC.Server
         [XmlAttribute]
         public ushort ListenPort { get; set; }        
         
-        public bool Initialize(DtoBase rootDto, IPrincipalProvider principalProvider)
+        public bool Initialize(ServerObjectBase rootDto, IPrincipalProvider principalProvider)
         {
             if (ListenPort < 1024)
                 return false;

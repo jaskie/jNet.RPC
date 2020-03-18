@@ -10,7 +10,7 @@ namespace jNet.RPC.Server
 {
     internal class ServerReferenceResolver : IReferenceResolver, IDisposable
     {
-        private readonly Dictionary<Guid, DtoBase> _knownDtos = new Dictionary<Guid, DtoBase>();        
+        private readonly Dictionary<Guid, ServerObjectBase> _knownDtos = new Dictionary<Guid, ServerObjectBase>();        
         public static readonly object Sync = new object();
         private int _disposed;
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
@@ -47,7 +47,7 @@ namespace jNet.RPC.Server
 
         public string GetReference(object context, object value)
         {
-            if (!(value is DtoBase dto)) 
+            if (!(value is ServerObjectBase dto)) 
                 return string.Empty;
 
             lock(Sync)
@@ -80,7 +80,7 @@ namespace jNet.RPC.Server
             {
                 if (!_knownDtos.TryGetValue(id, out var value))
                 {
-                    var dto = DtoBase.FindDto(id);
+                    var dto = ServerObjectBase.FindDto(id);
                     if (dto == null)
                         return null;
 
@@ -97,12 +97,12 @@ namespace jNet.RPC.Server
 
         #endregion //IReferenceResolver
 
-        public DtoBase ResolveReference(Guid reference)
+        public ServerObjectBase ResolveReference(Guid reference)
         {
             lock (Sync)
             {
                 if (!_knownDtos.TryGetValue(reference, out var p))
-                    return DtoBase.FindDto(reference);
+                    return ServerObjectBase.FindDto(reference);
 
                 return p;
             }
@@ -112,7 +112,7 @@ namespace jNet.RPC.Server
         {
             lock(Sync)
             {
-                var dto = DtoBase.FindDto(messageDto.DtoGuid);
+                var dto = ServerObjectBase.FindDto(messageDto.DtoGuid);
                 if (dto == null)
                 {
                     Logger.Warn("Could not restore Dto (null on server side)! {0}", dto.DtoGuid);
@@ -134,7 +134,7 @@ namespace jNet.RPC.Server
 
         private void Dto_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (!(sender is DtoBase dto))
+            if (!(sender is ServerObjectBase dto))
                 throw new InvalidOperationException("Object provided is not DtoBase");
             ReferencePropertyChanged?.Invoke(this, new WrappedEventArgs(dto, e));
         }

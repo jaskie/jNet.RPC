@@ -16,7 +16,7 @@ using Newtonsoft.Json;
 namespace jNet.RPC.Client
 {
     [JsonObject(IsReference = true, MemberSerialization = MemberSerialization.OptIn)]
-    public abstract class ProxyBase : IDto
+    public abstract class ProxyObjectBase : IDto
     {
         private int _isDisposed;
         private bool _finalizeRequested;
@@ -29,7 +29,7 @@ namespace jNet.RPC.Client
                 DoDispose();
         }
         
-        ~ProxyBase()
+        ~ProxyObjectBase()
         {
             if (!_finalizeRequested) //first finalization will send request to server; on response hard reference would be deleted and object collected in next GC run
             {
@@ -69,7 +69,7 @@ namespace jNet.RPC.Client
         
         public bool IsFinalized { get => _finalizeRequested; }
 
-        public static readonly ConcurrentDictionary<Guid, ProxyBase> FinalizeRequested = new ConcurrentDictionary<Guid, ProxyBase>();
+        public static readonly ConcurrentDictionary<Guid, ProxyObjectBase> FinalizeRequested = new ConcurrentDictionary<Guid, ProxyObjectBase>();
 
         public Guid DtoGuid { get; internal set; }        
 

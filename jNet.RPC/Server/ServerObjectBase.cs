@@ -13,11 +13,11 @@ using Newtonsoft.Json;
 namespace jNet.RPC.Server
 {
     [JsonObject(ItemTypeNameHandling = TypeNameHandling.Objects, IsReference = true, MemberSerialization = MemberSerialization.OptIn)]
-    public abstract class DtoBase: IDto
+    public abstract class ServerObjectBase: IDto
     {
-        private static readonly ConcurrentDictionary<Guid, WeakReference<DtoBase>> AllDtos = new ConcurrentDictionary<Guid, WeakReference<DtoBase>>();        
+        private static readonly ConcurrentDictionary<Guid, WeakReference<ServerObjectBase>> AllDtos = new ConcurrentDictionary<Guid, WeakReference<ServerObjectBase>>();        
 
-        internal static DtoBase FindDto(Guid guid)
+        internal static ServerObjectBase FindDto(Guid guid)
         {
             if (AllDtos.TryGetValue(guid, out var reference) && reference.TryGetTarget(out var result))
                 return result;
@@ -25,10 +25,10 @@ namespace jNet.RPC.Server
             return null;
         }
 
-        protected DtoBase()
+        protected ServerObjectBase()
         {
             DtoGuid = Guid.NewGuid();
-            AllDtos.TryAdd(DtoGuid, new WeakReference<DtoBase>(this));
+            AllDtos.TryAdd(DtoGuid, new WeakReference<ServerObjectBase>(this));
         }
 
         [XmlIgnore]
@@ -36,7 +36,7 @@ namespace jNet.RPC.Server
 
         private int _disposed;
 
-        ~DtoBase()
+        ~ServerObjectBase()
         {
             AllDtos.TryRemove(DtoGuid, out var _);
             Debug.WriteLine(this, $"{GetType().FullName} Finalized");
