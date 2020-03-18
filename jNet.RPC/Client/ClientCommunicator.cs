@@ -81,8 +81,11 @@ namespace jNet.RPC.Client
                     throw Deserialize<Exception>(response.Message);
 
                 var result = Deserialize<T>(response.Message);
+                
                 if (result == null)
                     Logger.Debug("Returning NULL! MessageGuid {0}:", query.MessageGuid);
+                
+                _messageHandledSemaphore.Release();
                 return result;
             }
             return default(T);
@@ -119,7 +122,8 @@ namespace jNet.RPC.Client
                 switch (message.MessageType)
                 {
                     case SocketMessage.SocketMessageType.ProxyFinalized:
-                        ((ClientReferenceResolver)ReferenceResolver).DeleteReference(message.DtoGuid);                        
+                        ((ClientReferenceResolver)ReferenceResolver).DeleteReference(message.DtoGuid);
+                        _messageHandledSemaphore.Release();
                         break;
 
                     case SocketMessage.SocketMessageType.EventNotification:
@@ -127,21 +131,22 @@ namespace jNet.RPC.Client
                         if (notifyObject == null)
                             Logger.Debug("NotifyObject null: {0}:{1}", message.MessageGuid, message.DtoGuid);
 
-                        notifyObject?.OnNotificationMessage(message);                        
+                        notifyObject?.OnNotificationMessage(message);
+                        _messageHandledSemaphore.Release();                       
                         break;
                                             
                     default:
                         if (!_requests.TryGetValue(message.MessageGuid, out var request))
                         {
                             Logger.Debug("Message consumer not found!");
+                            _messageHandledSemaphore.Release();
                             break;
                         }
 
                         request.Message = message;
                         request.Semaphore.Release();                        
                         break;
-                }
-                _messageHandledSemaphore.Release();
+                }               
             }
         }        
 
@@ -150,7 +155,12 @@ namespace jNet.RPC.Client
             using (var valueStream = message.ValueStream)
             {
                 if (valueStream == null)
+                {
+                    if (message.MessageType == SocketMessage.SocketMessageType.Query)
+                        Logger.Debug("Value stream null! {0}", message.MessageGuid);
                     return default(T);
+                }
+                    
              
                 using (var reader = new StreamReader(valueStream))
                 {

@@ -85,7 +85,7 @@ namespace jNet.RPC.Server
                         return null;
 
                     //_knownDtos[id] = value;
-                    Logger.Warn("Reference not found in knownDtos, but found locally - adding to known. {0}", dto.DtoGuid);
+                    //Logger.Warn("Reference not found in knownDtos, but found locally - adding to known. {0}", dto.DtoGuid);
                     return dto;
                 }
 

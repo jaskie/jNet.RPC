@@ -129,6 +129,8 @@ namespace jNet.RPC.Server
                                             SendException(message, e);
                                             throw;
                                         }
+                                        if (response == null)
+                                            Logger.Warn("Query response NULL! {0}", message.MessageGuid);
                                         SendResponse(message, response);
                                     }
                                     else
