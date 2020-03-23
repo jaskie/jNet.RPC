@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace jNet.RPCTests.MockModel
+namespace jNet.RPCUnitTests.MockModel
 {
     public interface IMockObject
     {

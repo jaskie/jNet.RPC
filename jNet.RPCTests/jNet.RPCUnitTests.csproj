@@ -7,8 +7,8 @@
     <ProjectGuid>{49534E5C-22CF-49F1-A4FC-FA3F91993A09}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>jNet.RPCTests</RootNamespace>
-    <AssemblyName>jNet.RPCTests</AssemblyName>
+    <RootNamespace>jNet.RPCUnitTests</RootNamespace>
+    <AssemblyName>jNet.RPCUnitTests</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{3AC096D0-A1C2-E12C-1390-A8335801FDAB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
@@ -59,16 +59,15 @@
     <Otherwise />
   </Choose>
   <ItemGroup>
-    <Compile Include="Client\ClientReferenceResolverTest.cs" />
-    <Compile Include="Client\ProxyBaseTest.cs" />
-    <Compile Include="MockCommunication\MockClient.cs" />
+    <Compile Include="Client\ClientReferenceResolverTests.cs" />
+    <Compile Include="Client\ProxyObjectBaseTests.cs" />
     <Compile Include="MockModel\IMockObject.cs" />
-    <Compile Include="MockModel\MockDto.cs" />
-    <Compile Include="MockModel\MockProxy.cs" />
+    <Compile Include="MockModel\MockServerObject.cs" />
+    <Compile Include="MockModel\MockProxyObject.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Server\DtoBaseTests.cs" />
     <Compile Include="Server\ServerHostTests.cs" />
-    <Compile Include="Server\ServerReferenceResolverTest.cs" />
+    <Compile Include="Server\ServerReferenceResolverTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

@@ -63,9 +63,7 @@ namespace jNet.RPC.Client
             _finalizeRequested = true;            
             Debug.WriteLine("Proxy strong reference delete {0}", DtoGuid);
             Debug.WriteLine(FinalizeRequested.Count);
-        }
-        
-        public bool IsFinalized { get => _finalizeRequested; }
+        }                
 
         public static readonly ConcurrentDictionary<Guid, ProxyObjectBase> FinalizeRequested = new ConcurrentDictionary<Guid, ProxyObjectBase>();
 
