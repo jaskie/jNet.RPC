@@ -65,7 +65,7 @@ namespace jNet.RPC.Client
                 }
                 catch (Exception ex)
                 {
-                    if (ex.GetType() == typeof(OperationCanceledException))
+                    if (ex is OperationCanceledException)
                         break;
 
                     Logger.Error(ex, "Unexpected error in SendAndGetResponseProc");
@@ -103,9 +103,8 @@ namespace jNet.RPC.Client
                     }
                     catch (Exception ex)
                     {
-                        if (ex.GetType() == typeof(OperationCanceledException))
+                        if (ex is OperationCanceledException)
                             break;
-
                         Logger.Error(ex, "Unexpected error in MessageHandler");
                     }
                     continue;
@@ -118,6 +117,8 @@ namespace jNet.RPC.Client
 
                 if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
                     Logger.Debug("Processing message: {0}:{1}:{2}:{3}", message.MessageGuid, message.DtoGuid, message.MemberName, message.ValueString);
+
+                //System.Diagnostics.Debug.WriteLine(message.ValueString);
 
                 switch (message.MessageType)
                 {
@@ -158,7 +159,7 @@ namespace jNet.RPC.Client
                 {
                     if (message.MessageType == SocketMessage.SocketMessageType.Query)
                         Logger.Debug("Value stream null! {0}", message.MessageGuid);
-                    return default(T);
+                    return default;
                 }
                     
              

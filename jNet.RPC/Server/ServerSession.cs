@@ -293,17 +293,17 @@ namespace jNet.RPC.Server
                     && eventName == nameof(INotifyPropertyChanged.PropertyChanged))
                 {
                     var p = dto.GetType().GetProperty(propertyChangedEventArgs.PropertyName);
-                    PropertyChangedValueReader valueReader;
+                    PropertyChangedWithValueEventArgs value;
                     if (p?.CanRead == true)
-                        valueReader = new PropertyChangedValueReader(propertyChangedEventArgs.PropertyName, () => p.GetValue(dto, null));
+                        value = new PropertyChangedWithValueEventArgs(propertyChangedEventArgs.PropertyName, p.GetValue(dto, null));
                     else
                     {
-                        valueReader = new PropertyChangedValueReader(propertyChangedEventArgs.PropertyName, () => null);
+                        value = new PropertyChangedWithValueEventArgs(propertyChangedEventArgs.PropertyName, null);
                         Debug.WriteLine(dto,
                             $"{GetType()}: Couldn't get value of {propertyChangedEventArgs.PropertyName}");
                     }
                     Debug.WriteLine($"Server: PropertyChanged {propertyChangedEventArgs.PropertyName} on {dto} sent");
-                    Send(new SocketMessage(valueReader)
+                    Send(new SocketMessage(value)
                     {
                         MessageType = SocketMessage.SocketMessageType.EventNotification,
                         DtoGuid = dto.DtoGuid,
@@ -315,8 +315,7 @@ namespace jNet.RPC.Server
                     {
                         MessageType = SocketMessage.SocketMessageType.EventNotification,
                         DtoGuid = dto.DtoGuid,
-                        MemberName = eventName,
-
+                        MemberName = eventName
                     });
             }
             catch (Exception exception)

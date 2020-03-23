@@ -33,7 +33,8 @@ namespace jNet.RPC
         private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
 
         public TcpClient Client { get; private set; }
-        public JsonSerializer Serializer { get; } = JsonSerializer.CreateDefault();
+        public JsonSerializer Serializer { get; } 
+       
         protected IReferenceResolver ReferenceResolver { get; }
 
         protected SocketConnection(TcpClient client, IReferenceResolver referenceResolver)
@@ -42,25 +43,32 @@ namespace jNet.RPC
             client.NoDelay = true;
             ReferenceResolver = referenceResolver;
             _maxQueueSize = 0x1000;
-            Serializer.ReferenceResolver = referenceResolver;
-            Serializer.TypeNameHandling = TypeNameHandling.Objects;
-            Serializer.Context = new StreamingContext(StreamingContextStates.Remoting);
+            Serializer = JsonSerializer.CreateDefault(new JsonSerializerSettings
+            {
+                ContractResolver = new SerializationContractResolver(),
+                ReferenceResolverProvider = () => referenceResolver,
+                TypeNameHandling = TypeNameHandling.Objects,
+                Context = new StreamingContext(StreamingContextStates.Remoting),
 #if DEBUG
-            Serializer.Formatting = Formatting.Indented;
+                Formatting = Formatting.Indented
 #endif
+            });
         }
 
         protected SocketConnection(IReferenceResolver referenceResolver)
         {
             ReferenceResolver = referenceResolver;
-            _maxQueueSize = 0x10000;                        
-            Serializer = JsonSerializer.CreateDefault();
-            Serializer.Context = new StreamingContext(StreamingContextStates.Remoting, this);
-            Serializer.ReferenceResolver = referenceResolver;
-            Serializer.TypeNameHandling = TypeNameHandling.Objects | TypeNameHandling.Arrays;
+            _maxQueueSize = 0x10000;
+            Serializer = JsonSerializer.CreateDefault(new JsonSerializerSettings
+            {
+                ContractResolver = new SerializationContractResolver(),
+                Context = new StreamingContext(StreamingContextStates.Remoting, this),
+                ReferenceResolverProvider = () => referenceResolver,
+                TypeNameHandling = TypeNameHandling.Objects | TypeNameHandling.Arrays,
 #if DEBUG
-            Serializer.Formatting = Formatting.Indented;
-#endif                                     
+                Formatting = Formatting.Indented
+#endif
+            });
         }
 
         public async Task<bool> Connect(string address)
@@ -103,11 +111,12 @@ namespace jNet.RPC
             {
                 if (_sendQueue.Count < _maxQueueSize)
                 {
-                    var serializedData = SerializeDto(message.Value);
+                    var serializedData = message.MessageType == SocketMessage.SocketMessageType.EventNotification
+                        ? SerializeEventArgs(message.Value)
+                        : SerializeDto(message.Value);
                     _sendQueue.Enqueue(message.Encode(serializedData));
                     if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
-                        Logger.Debug("Message queued to send {0}:{1}:{2}", message.MessageGuid, message.DtoGuid, message.MessageType);
-                    
+                        Logger.Debug("Message queued to send {0}:{1}:{2}", message.MessageGuid, message.DtoGuid, message.MessageType);                    
                     _sendAutoResetEvent.Set();
                     return;
                 }
@@ -119,6 +128,8 @@ namespace jNet.RPC
             }
             NotifyDisconnection();
         }
+
+
 
         public bool IsConnected { get; private set; } = true;
         
@@ -243,14 +254,22 @@ namespace jNet.RPC
                 return;
             IsConnected = false;
             Disconnected?.Invoke(this, EventArgs.Empty);
-        }        
+        }
+
+        private Stream SerializeEventArgs(object eventArgs)
+        {
+            var serialized = new MemoryStream();
+            using (var writer = new StreamWriter(serialized, Encoding.UTF8, 1024, true))
+                Serializer.Serialize(writer, eventArgs);
+            return serialized;
+
+        }
 
         protected Stream SerializeDto(object dto)
         {
             if (dto == null)
                 return null;
             var serialized = new MemoryStream();
-
             using (var writer = new StreamWriter(serialized, Encoding.UTF8, 1024, true))
                 Serializer.Serialize(writer, dto);
 

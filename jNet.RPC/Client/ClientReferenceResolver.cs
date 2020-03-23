@@ -1,13 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading;
-using System.Threading.Tasks;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 
 namespace jNet.RPC.Client
 {
-    internal class ClientReferenceResolver : IReferenceResolver, IDisposable
+    internal class ClientReferenceResolver : Newtonsoft.Json.Serialization.IReferenceResolver, IDisposable
     {
         private readonly Dictionary<Guid, WeakReference<ProxyObjectBase>> _knownDtos = new Dictionary<Guid, WeakReference<ProxyObjectBase>>();        
         private int _disposed;
@@ -16,7 +13,7 @@ namespace jNet.RPC.Client
 
         public void Dispose()
         {
-            if (Interlocked.Exchange(ref _disposed, 1) != default(int))
+            if (Interlocked.Exchange(ref _disposed, 1) != default)
                 return;
 
             _knownDtos.Clear();
@@ -58,9 +55,8 @@ namespace jNet.RPC.Client
 
         public bool IsReferenced(object context, object value)
         {
-            if (!(value is IDto dto))
+            if (!(value is IDto))
                 return false;
-            
             return true;            
         }
 

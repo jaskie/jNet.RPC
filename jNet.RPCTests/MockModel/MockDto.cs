@@ -1,11 +1,11 @@
-﻿using jNet.RPC.Server;
-using Newtonsoft.Json;
+﻿using jNet.RPC;
+using jNet.RPC.Server;
 
 namespace jNet.RPCTests.MockModel
 {
-    public class MockDto : DtoBase, IMockObject
+    public class MockDto : ServerObjectBase, IMockObject
     {
-        [JsonProperty(nameof(IMockObject.Value))]
+        [DtoField]
         public string Value { get; set; }
 
         public MockDto()

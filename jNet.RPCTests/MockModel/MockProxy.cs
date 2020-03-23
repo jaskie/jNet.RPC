@@ -1,12 +1,11 @@
 ﻿using jNet.RPC;
 using jNet.RPC.Client;
-using Newtonsoft.Json;
 
 namespace jNet.RPCTests.MockModel
 {
-    public class MockProxy : ProxyBase, IMockObject
+    public class MockProxy : ProxyObjectBase, IMockObject
     {
-        [JsonProperty(nameof(IMockObject.Value))]
+        [DtoField(nameof(IMockObject.Value))]
         private string _value;
         public string Value { get => _value; set => Set(value); }
 

@@ -43,7 +43,7 @@ namespace jNet.RPCTests.Client
             ClientReferenceResolver clientReferenceResolver = new ClientReferenceResolver();
             PrivateObject po = new PrivateObject(clientReferenceResolver);
             var mockObject = new MockProxy();
-            var knownDtos = ((Dictionary<Guid, WeakReference<ProxyBase>>)po.GetField("_knownDtos"));
+            var knownDtos = ((Dictionary<Guid, WeakReference<ProxyObjectBase>>)po.GetField("_knownDtos"));
 
 
             var knownDtosInitialCount = knownDtos.Count;
@@ -60,7 +60,7 @@ namespace jNet.RPCTests.Client
             ClientReferenceResolver clientReferenceResolver = new ClientReferenceResolver();            
             PrivateObject po = new PrivateObject(clientReferenceResolver);
             var mockObject = new MockProxy();
-            var knownDtos = ((Dictionary<Guid, WeakReference<ProxyBase>>)po.GetField("_knownDtos"));
+            var knownDtos = ((Dictionary<Guid, WeakReference<ProxyObjectBase>>)po.GetField("_knownDtos"));
 
             clientReferenceResolver.AddReference(this, mockObject.DtoGuid.ToString(), mockObject);
 
@@ -126,14 +126,14 @@ namespace jNet.RPCTests.Client
         public void ResolveReference_ReferenceFinalized_ReturnDto()
         {
             ClientReferenceResolver clientReferenceResolver = new ClientReferenceResolver();
-            WeakReference<ProxyBase> weakReference = null;
+            WeakReference<ProxyObjectBase> weakReference = null;
             Guid guid = Guid.Empty;
 
 
             new Action(() =>
             {
                 var mockObject = new MockProxy { DtoGuid = Guid.NewGuid() };
-                weakReference = new WeakReference<ProxyBase>(mockObject, true);
+                weakReference = new WeakReference<ProxyObjectBase>(mockObject, true);
                 clientReferenceResolver.AddReference(this, mockObject.DtoGuid.ToString(), mockObject);
                 guid = new Guid(mockObject.DtoGuid.ToString());
             })();
@@ -142,12 +142,12 @@ namespace jNet.RPCTests.Client
             GC.Collect();
             GC.WaitForPendingFinalizers();
 
-            if (ProxyBase.FinalizeRequested.Count < 1)
+            if (ProxyObjectBase.FinalizeRequested.Count < 1)
                 Assert.Fail("Object did not finalize or finalized instantly");
 
             new Action(() =>
             {
-                ProxyBase.FinalizeRequested.TryGetValue(guid, out var target);
+                ProxyObjectBase.FinalizeRequested.TryGetValue(guid, out var target);
                 if (target == null)
                     Assert.Fail("Guid mismatch");
                 target.Resurrect();
@@ -160,9 +160,9 @@ namespace jNet.RPCTests.Client
 
             new Action(() =>
             {
-                if (ProxyBase.FinalizeRequested.ContainsKey(guid))
+                if (ProxyObjectBase.FinalizeRequested.ContainsKey(guid))
                 {
-                    ProxyBase.FinalizeRequested.TryGetValue(guid, out var target);
+                    ProxyObjectBase.FinalizeRequested.TryGetValue(guid, out var target);
                     target.FinalizeProxy();
                 }
                 else
@@ -172,7 +172,7 @@ namespace jNet.RPCTests.Client
             GC.Collect();
             GC.WaitForPendingFinalizers();
 
-            if (ProxyBase.FinalizeRequested.Count > 0 && !weakReference.TryGetTarget(out _))
+            if (ProxyObjectBase.FinalizeRequested.Count > 0 && !weakReference.TryGetTarget(out _))
                 Assert.Fail("Object did not finalize properly.");
 
         }

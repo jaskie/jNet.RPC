@@ -15,11 +15,11 @@ namespace jNet.RPCTests.Client
         [TestMethod]
         public void Finalizer_Any()
         {
-            WeakReference<ProxyBase> weakReference = null;
+            WeakReference<ProxyObjectBase> weakReference = null;
             new Action(() => 
             {
                 var proxy = new MockProxy();
-                weakReference = new WeakReference<ProxyBase>(proxy, true);
+                weakReference = new WeakReference<ProxyObjectBase>(proxy, true);
             })();
 
             GC.Collect(); //first finalization (mark as finalized)
@@ -28,7 +28,7 @@ namespace jNet.RPCTests.Client
             new Action(() =>
             {
                 weakReference.TryGetTarget(out var target);
-                Assert.IsTrue(ProxyBase.FinalizeRequested.ContainsKey(target.DtoGuid), "Object did not save itself!");
+                Assert.IsTrue(ProxyObjectBase.FinalizeRequested.ContainsKey(target.DtoGuid), "Object did not save itself!");
                 target.FinalizeProxy();
             })();
 
@@ -37,7 +37,7 @@ namespace jNet.RPCTests.Client
             GC.Collect(); //collect finalized
             GC.WaitForPendingFinalizers();
 
-            Assert.IsTrue(ProxyBase.FinalizeRequested.Count == 0, "There should be no Finalization Requests at this point!");
+            Assert.IsTrue(ProxyObjectBase.FinalizeRequested.Count == 0, "There should be no Finalization Requests at this point!");
             Assert.IsFalse(weakReference.TryGetTarget(out _), "GetTarget should not return anything!");
         }        
     }

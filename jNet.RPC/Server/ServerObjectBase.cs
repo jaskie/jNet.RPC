@@ -12,7 +12,8 @@ using Newtonsoft.Json;
 
 namespace jNet.RPC.Server
 {
-    [JsonObject(ItemTypeNameHandling = TypeNameHandling.Objects, IsReference = true, MemberSerialization = MemberSerialization.OptIn)]
+
+    //TODO: remove
     public abstract class ServerObjectBase: IDto
     {
         private static readonly ConcurrentDictionary<Guid, WeakReference<ServerObjectBase>> AllDtos = new ConcurrentDictionary<Guid, WeakReference<ServerObjectBase>>();        

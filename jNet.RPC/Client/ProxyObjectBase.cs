@@ -11,11 +11,9 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Threading;
-using Newtonsoft.Json;
 
 namespace jNet.RPC.Client
 {
-    [JsonObject(IsReference = true, MemberSerialization = MemberSerialization.OptIn)]
     public abstract class ProxyObjectBase : IDto
     {
         private int _isDisposed;
@@ -98,8 +96,8 @@ namespace jNet.RPC.Client
             Type type = GetType();
             FieldInfo field = type.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
                 .FirstOrDefault(p =>
-                    p.GetCustomAttributes(typeof(JsonPropertyAttribute), true)
-                        .Any(a => ((JsonPropertyAttribute) a).PropertyName == propertyName));
+                    p.GetCustomAttributes(typeof(DtoFieldAttribute), true)
+                        .Any(a => ((DtoFieldAttribute) a).PropertyName == propertyName));
             if (field != null)
             {
                 var currentValue = (T)field.GetValue(this);
@@ -177,7 +175,7 @@ namespace jNet.RPC.Client
         {
             if (message.MemberName == nameof(INotifyPropertyChanged.PropertyChanged))
             {
-                var eav = Deserialize<PropertyChangedWithDataEventArgs>(message);
+                var eav = Deserialize<PropertyChangedWithValueEventArgs>(message);
                 if (eav == null)
                     return;
                 Debug.WriteLine($"{this}: property notified {eav.PropertyName}, value {eav.Value}");
@@ -209,7 +207,7 @@ namespace jNet.RPC.Client
             if (t == null)
                 return null;
             const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly;
-            var foundField = t.GetFields(flags).FirstOrDefault(f => f.GetCustomAttributes(typeof(JsonPropertyAttribute), true).Any(a =>((JsonPropertyAttribute)a).PropertyName == fieldName));
+            var foundField = t.GetFields(flags).FirstOrDefault(f => f.GetCustomAttributes(typeof(DtoFieldAttribute), true).Any(a =>((DtoFieldAttribute)a).PropertyName == fieldName));
             return foundField ?? GetField(t.BaseType, fieldName);
         }
 

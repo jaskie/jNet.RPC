@@ -15,7 +15,7 @@ namespace jNet.RPCTests.Server
         {
             var serverReferenceResolver = new ServerReferenceResolver();
             PrivateObject po = new PrivateObject(serverReferenceResolver);
-            var _knownDtos = ((Dictionary<Guid, DtoBase>)po.GetField("_knownDtos"));
+            var _knownDtos = ((Dictionary<Guid, ServerObjectBase>)po.GetField("_knownDtos"));
             var mockObject = new MockDto("TestValue");
             _knownDtos.Add(mockObject.DtoGuid, mockObject);
 
@@ -43,7 +43,7 @@ namespace jNet.RPCTests.Server
             var serverReferenceResolver = new ServerReferenceResolver();
             PrivateObject po = new PrivateObject(serverReferenceResolver);
             var mockObject = new MockDto("TestValue");
-            var _knownDtos = ((Dictionary<Guid, DtoBase>)po.GetField("_knownDtos"));
+            var _knownDtos = ((Dictionary<Guid, ServerObjectBase>)po.GetField("_knownDtos"));
 
 
             var _knownDtosCount = _knownDtos.Count;
@@ -99,7 +99,7 @@ namespace jNet.RPCTests.Server
             var serverReferenceResolver = new ServerReferenceResolver();
             PrivateObject po = new PrivateObject(serverReferenceResolver);
             var mockObject = new MockDto("TestValue");
-            var _knownDtos = ((Dictionary<Guid, DtoBase>)po.GetField("_knownDtos"));
+            var _knownDtos = ((Dictionary<Guid, ServerObjectBase>)po.GetField("_knownDtos"));
             _knownDtos.Add(mockObject.DtoGuid, mockObject);
 
             var _knownDtosCount = _knownDtos.Count;
@@ -117,7 +117,7 @@ namespace jNet.RPCTests.Server
             var serverReferenceResolver = new ServerReferenceResolver();
             PrivateObject po = new PrivateObject(serverReferenceResolver);
             var mockObject = new MockDto("TestValue");
-            var _knownDtos = ((Dictionary<Guid, DtoBase>)po.GetField("_knownDtos"));
+            var _knownDtos = ((Dictionary<Guid, ServerObjectBase>)po.GetField("_knownDtos"));
 
             var _knownDtosCount = _knownDtos.Count;
 

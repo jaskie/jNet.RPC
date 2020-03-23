@@ -66,8 +66,10 @@
     <Compile Include="Client\MessageRequest.cs" />
     <Compile Include="Client\ProxyObjectBaseEventArgs.cs" />
     <Compile Include="Client\ClientCommunicator.cs" />
+    <Compile Include="DtoFieldAttribute.cs" />
     <Compile Include="IRemoteHostConfig.cs" />
     <Compile Include="PropertyChangedWithValueEventArgs.cs" />
+    <Compile Include="SerializationContractResolver.cs" />
     <Compile Include="Server\IPrincipalProvider.cs" />
     <Compile Include="Server\PrincipalProvider.cs" />
     <Compile Include="Server\ServerReferenceResolver.cs" />

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Text;
-using Newtonsoft.Json;
 
 namespace jNet.RPC
 {
@@ -31,18 +30,12 @@ namespace jNet.RPC
 
         private readonly byte[] _rawData;
         private readonly int _valueStartIndex;
-        private readonly PropertyChangedValueReader _propertChangedValueReader;
         private readonly object _value;
 
         internal SocketMessage(object value)
         {
             MessageGuid = Guid.NewGuid();
             _value = value;
-        }
-
-        internal SocketMessage(PropertyChangedValueReader propertyChangedValueReader)
-        {
-            _propertChangedValueReader = propertyChangedValueReader;
         }
 
         internal SocketMessage(SocketMessage originalMessage, object value)
@@ -78,16 +71,7 @@ namespace jNet.RPC
             _rawData = rawData;
         }
 
-        public object Value
-        {
-            get
-            {
-                if (_propertChangedValueReader == null)
-                    return _value;
-                var value = _propertChangedValueReader.ValueFunc();
-                return PropertyChangedWithDataEventArgs.Create(_propertChangedValueReader.PropertyName, value);
-            }
-        }
+        public object Value => _value;
 
         public readonly Guid MessageGuid;
         public Guid DtoGuid;
@@ -159,10 +143,10 @@ namespace jNet.RPC
         public string ValueString => Encoding.UTF8.GetString(_rawData, _valueStartIndex, _rawData.Length - _valueStartIndex);
     }
 
-    [JsonObject(IsReference = false)]
     public class SocketMessageArrayValue 
     {
-        [JsonProperty(TypeNameHandling = TypeNameHandling.Arrays, ItemTypeNameHandling = TypeNameHandling.Objects | TypeNameHandling.Arrays)]
+        //[DtoField(TypeNameHandling = TypeNameHandling.Arrays, ItemTypeNameHandling = TypeNameHandling.Objects | TypeNameHandling.Arrays)]
+        [DtoField]
         public object[] Value;
     }
 
