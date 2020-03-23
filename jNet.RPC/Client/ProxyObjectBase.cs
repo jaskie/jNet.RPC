@@ -23,7 +23,7 @@ namespace jNet.RPC.Client
         public static readonly object Sync = new object();
         public void Dispose()
         {
-            if (Interlocked.Exchange(ref _isDisposed, DisposedValue) == default(int))
+            if (Interlocked.Exchange(ref _isDisposed, DisposedValue) == default)
                 DoDispose();
         }
         
@@ -59,7 +59,7 @@ namespace jNet.RPC.Client
 
         public void FinalizeProxy()
         {
-            FinalizeRequested.TryRemove(DtoGuid, out var temp);
+            FinalizeRequested.TryRemove(DtoGuid, out _);
             _finalizeRequested = true;            
             Debug.WriteLine("Proxy strong reference delete {0}", DtoGuid);
             Debug.WriteLine(FinalizeRequested.Count);
@@ -81,9 +81,9 @@ namespace jNet.RPC.Client
         protected T Get<T>([CallerMemberName] string propertyName = null)
         {
             if (_isDisposed == DisposedValue)
-                return default(T);
+                return default;
             if (string.IsNullOrEmpty(propertyName))
-                return default(T);
+                return default;
             var result = _client.Get<T>(this, propertyName);
             Debug.WriteLine($"Get:{result} for property {propertyName} of {this}");
             return result;
@@ -93,11 +93,8 @@ namespace jNet.RPC.Client
         {
             if (_isDisposed == DisposedValue)
                 return;
-            Type type = GetType();
-            FieldInfo field = type.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
-                .FirstOrDefault(p =>
-                    p.GetCustomAttributes(typeof(DtoFieldAttribute), true)
-                        .Any(a => ((DtoFieldAttribute) a).PropertyName == propertyName));
+            Type type = typeof(T);
+            FieldInfo field =  GetField(type, propertyName);
             if (field != null)
             {
                 var currentValue = (T)field.GetValue(this);
@@ -117,7 +114,7 @@ namespace jNet.RPC.Client
         protected T Query<T>([CallerMemberName] string methodName = null, params object[] parameters)
         {
             if (_isDisposed == DisposedValue)
-                return default(T);
+                return default;
             return _client.Query<T>(this, methodName, parameters);
         }
 
@@ -161,11 +158,11 @@ namespace jNet.RPC.Client
         protected T Deserialize<T>(SocketMessage message)
         {
             if (_client == null)
-                return default(T);
+                return default;
             using (var valueStream = message.ValueStream)
             {
                 if (valueStream == null)
-                    return default(T);
+                    return default;
                 using (var reader = new StreamReader(valueStream))
                     return (T) _client.Serializer.Deserialize(reader, typeof(T));
             }
@@ -207,7 +204,7 @@ namespace jNet.RPC.Client
             if (t == null)
                 return null;
             const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly;
-            var foundField = t.GetFields(flags).FirstOrDefault(f => f.GetCustomAttributes(typeof(DtoFieldAttribute), true).Any(a =>((DtoFieldAttribute)a).PropertyName == fieldName));
+            var foundField = t.GetFields(flags).FirstOrDefault(f => f.GetCustomAttributes(typeof(DtoMemberAttribute), true).Any(a =>((DtoMemberAttribute)a).PropertyName == fieldName));
             return foundField ?? GetField(t.BaseType, fieldName);
         }
 

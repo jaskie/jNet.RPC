@@ -3,9 +3,9 @@
 namespace jNet.RPC
 {
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
-    public sealed class DtoFieldAttribute : Attribute
+    public sealed class DtoMemberAttribute : Attribute
     {
-        public DtoFieldAttribute(string propertyName = null)
+        public DtoMemberAttribute(string propertyName = null)
         {
             PropertyName = propertyName;
         }

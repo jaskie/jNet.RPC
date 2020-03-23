@@ -5,7 +5,7 @@ namespace jNet.RPCTests.MockModel
 {
     public class MockDto : ServerObjectBase, IMockObject
     {
-        [DtoField]
+        [DtoMember]
         public string Value { get; set; }
 
         public MockDto()

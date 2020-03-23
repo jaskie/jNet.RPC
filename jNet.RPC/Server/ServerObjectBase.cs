@@ -8,12 +8,9 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Xml.Serialization;
-using Newtonsoft.Json;
 
 namespace jNet.RPC.Server
 {
-
-    //TODO: remove
     public abstract class ServerObjectBase: IDto
     {
         private static readonly ConcurrentDictionary<Guid, WeakReference<ServerObjectBase>> AllDtos = new ConcurrentDictionary<Guid, WeakReference<ServerObjectBase>>();        
@@ -57,13 +54,13 @@ namespace jNet.RPC.Server
 
         public void Dispose()
         {
-            if (Interlocked.Exchange(ref _disposed, 1) != default(int))
+            if (Interlocked.Exchange(ref _disposed, 1) != default)
                 return;
             DoDispose();
             Disposed?.Invoke(this, EventArgs.Empty);
         }
 
-        protected bool IsDisposed => _disposed != default(int);
+        protected bool IsDisposed => _disposed != default;
 
         protected virtual void DoDispose()
         {

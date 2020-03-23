@@ -24,7 +24,7 @@ namespace jNet.RPC.Server
 #endif
         public void Dispose()
         {
-            if (Interlocked.Exchange(ref _disposed, 1) != default(int))
+            if (Interlocked.Exchange(ref _disposed, 1) != default)
                 return;
 
             lock(Sync)

@@ -146,7 +146,7 @@ namespace jNet.RPC
     public class SocketMessageArrayValue 
     {
         //[DtoField(TypeNameHandling = TypeNameHandling.Arrays, ItemTypeNameHandling = TypeNameHandling.Objects | TypeNameHandling.Arrays)]
-        [DtoField]
+        [DtoMember]
         public object[] Value;
     }
 

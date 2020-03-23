@@ -5,7 +5,7 @@ namespace jNet.RPCTests.MockModel
 {
     public class MockProxy : ProxyObjectBase, IMockObject
     {
-        [DtoField(nameof(IMockObject.Value))]
+        [DtoMember(nameof(IMockObject.Value))]
         private string _value;
         public string Value { get => _value; set => Set(value); }
 

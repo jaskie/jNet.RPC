@@ -120,7 +120,7 @@ namespace jNet.RPC.Server
 
         public void Dispose()
         {
-            if (Interlocked.Exchange(ref _disposed, 1) == default(int))
+            if (Interlocked.Exchange(ref _disposed, 1) == default)
                 UnInitialize();
         }
 

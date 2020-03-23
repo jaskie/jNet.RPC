@@ -31,7 +31,7 @@ namespace jNet.RPC
                 property.Ignored = false;
                 property.HasMemberAttribute = true;
                 property.UnderlyingName = member.Name;
-                var name = member.GetCustomAttribute<DtoFieldAttribute>()?.PropertyName;
+                var name = member.GetCustomAttribute<DtoMemberAttribute>()?.PropertyName;
                 property.PropertyName = name ?? member.Name;
                 return property;
             }
@@ -66,7 +66,7 @@ namespace jNet.RPC
                     type == rootType 
                     ? BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public 
                     : BindingFlags.Instance | BindingFlags.NonPublic)
-                    .Where(m => m.GetCustomAttribute<DtoFieldAttribute>(false) != null))
+                    .Where(m => m.GetCustomAttribute<DtoMemberAttribute>(false) != null))
                     yield return member;
                 type = type.BaseType;
             }

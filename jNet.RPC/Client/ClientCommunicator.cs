@@ -88,7 +88,7 @@ namespace jNet.RPC.Client
                 _messageHandledSemaphore.Release();
                 return result;
             }
-            return default(T);
+            return default;
         }                       
 
         protected override async Task MessageHandlerProc()
