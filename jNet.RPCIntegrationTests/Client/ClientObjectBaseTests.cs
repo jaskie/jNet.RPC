@@ -2,7 +2,6 @@
 using jNet.RPCUnitTests.MockModel;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
-using System.Linq;
 
 namespace jNet.RPCIntegrationTests.Client
 {

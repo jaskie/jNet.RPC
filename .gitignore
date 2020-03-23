@@ -3,5 +3,7 @@
 /jNet.RPC/bin
 /jNet.RPC/obj
 /packages
-/jNet.RPCTests/obj
-/jNet.RPCTests/bin
+/jNet.RPCUnitTests/obj
+/jNet.RPCUnitTests/bin
+/jNet.RPCIntegrationTests/bin
+/jNet.RPCIntegrationTests/obj

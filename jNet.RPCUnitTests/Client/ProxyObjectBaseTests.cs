@@ -53,7 +53,7 @@ namespace jNet.RPCUnitTests.Client
         }
 
         [TestMethod]
-        public void FinalizeProxyTest()
+        public void FinalizeProxy_Void()
         {
             if (!ProxyObjectBase.FinalizeRequested.TryAdd(_mockProxy.DtoGuid, _mockProxy))
                 Assert.Fail("Could not add object to Finalize Requests");
@@ -64,10 +64,19 @@ namespace jNet.RPCUnitTests.Client
         }
 
         [TestMethod]
-        public void ResurrectTest()
+        public void ResurrectTest_Void()
         {
+            bool resurrectedInvoked = false;
+
             if (!ProxyObjectBase.FinalizeRequested.TryAdd(_mockProxy.DtoGuid, _mockProxy))
                 Assert.Fail("Could not add object to Finalize Requests");
+            
+            _mockProxy.Resurrected += (s, e) => { resurrectedInvoked = true; };
+            _mockProxy.Resurrect();
+
+            Assert.IsTrue(resurrectedInvoked, "Object did not notified about resurrection!");
+            Assert.IsFalse(ProxyObjectBase.FinalizeRequested.ContainsKey(_mockProxy.DtoGuid), "Object shouldn't be here after resurrection!");
+
         }
         
     }

@@ -2,12 +2,7 @@
 using jNet.RPCUnitTests.MockModel;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace jNet.RPCUnitTests.Client
 {
@@ -34,7 +29,7 @@ namespace jNet.RPCUnitTests.Client
         {
             _knownDtos.Add(_mockObject.DtoGuid, new WeakReference<ProxyObjectBase>(_mockObject));            
             var proxy = _clientReferenceResolver.ResolveReference(_mockObject.DtoGuid);
-            Assert.AreEqual(_mockObject, proxy, "Object are not the same!");
+            Assert.AreEqual(_mockObject, proxy, "Objects are not the same!");
         }
 
         [TestMethod]

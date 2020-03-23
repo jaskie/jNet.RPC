@@ -50,17 +50,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Client\ClientObjectBaseTests.cs" />
-    <Compile Include="UnitTest1.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\jNet.RPCTests\jNet.RPCUnitTests.csproj">
-      <Project>{49534E5C-22CF-49F1-A4FC-FA3F91993A09}</Project>
-      <Name>jNet.RPCUnitTests</Name>
-    </ProjectReference>
     <ProjectReference Include="..\jNet.RPC\jNet.RPC.csproj">
       <Project>{15324B69-7D18-49F3-9141-B024079356E8}</Project>
       <Name>jNet.RPC</Name>

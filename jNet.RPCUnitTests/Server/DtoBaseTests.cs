@@ -11,11 +11,7 @@ namespace jNet.RPC.Server.Tests
         [TestMethod]
         public void DtosStoreTest_CreateAndStoreGUID_GUIDFound()
         {
-<<<<<<< Updated upstream
-            var _mockObject = new MockDto("TestValue");            
-=======
             var _mockObject = new MockServerObject("TestValue");            
->>>>>>> Stashed changes
             Assert.IsNotNull(ServerObjectBase.FindDto(_mockObject.DtoGuid), "Guid not found in know dtos after object creation.");
         }      
 
