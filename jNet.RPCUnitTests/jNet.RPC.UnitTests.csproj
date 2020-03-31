@@ -61,7 +61,6 @@
   <ItemGroup>
     <Compile Include="Client\ClientReferenceResolverTests.cs" />
     <Compile Include="Client\ProxyObjectBaseTests.cs" />
-    <Compile Include="MockModel\IMockObject.cs" />
     <Compile Include="MockModel\MockServerObject.cs" />
     <Compile Include="MockModel\MockProxyObject.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

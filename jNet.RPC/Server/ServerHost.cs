@@ -15,20 +15,24 @@ namespace jNet.RPC.Server
         private int _disposed;
         private TcpListener _listener;
         private Thread _listenerThread;
-        private IDto _rootDto;
+        private IDto _rootServerObject;
         private IPrincipalProvider _principalProvider;
         private readonly List<ServerSession> _clients = new List<ServerSession>();
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        
-        [XmlAttribute]
-        public ushort ListenPort { get; set; }        
-        
-        public bool Initialize(ServerObjectBase rootDto, IPrincipalProvider principalProvider)
+                
+        public ushort ListenPort { get; set; }
+
+        public ServerHost(ushort listenPort, ServerObjectBase rootObject, IPrincipalProvider principalProvider = null)
+        {
+            ListenPort = listenPort;
+            _rootServerObject = rootObject;
+            _principalProvider = principalProvider ?? PrincipalProvider.Default;
+        }
+        public bool Start()
         {
             if (ListenPort < 1024)
                 return false;
-            _rootDto = rootDto;
-            _principalProvider = principalProvider;
+            
             try
             {
                 _listener = new TcpListener(IPAddress.Any, ListenPort) {ExclusiveAddressUse = true};
@@ -94,7 +98,7 @@ namespace jNet.RPC.Server
 
         private void AddClient(TcpClient client)
         {
-            var clientSession = new ServerSession(client, _rootDto, _principalProvider);
+            var clientSession = new ServerSession(client, _rootServerObject, _principalProvider);
             clientSession.Disconnected += ClientSessionDisconnected;
             lock (((IList)_clients).SyncRoot)
                 _clients.Add(clientSession);
@@ -126,6 +130,7 @@ namespace jNet.RPC.Server
 
         public void UnInitialize()
         {
+            _listener?.Stop();
             _listenerThread?.Abort();
         }
 

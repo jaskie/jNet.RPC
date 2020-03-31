@@ -7,3 +7,9 @@
 /jNet.RPCUnitTests/bin
 /jNet.RPCIntegrationTests/bin
 /jNet.RPCIntegrationTests/obj
+/jNet.RPC.Client/obj
+/jNet.RPC.Client/bin
+/jNet.RPC.Common/obj
+/jNet.RPC.Common/bin
+/jNet.RPC.Server/obj
+/jNet.RPC.Server/bin

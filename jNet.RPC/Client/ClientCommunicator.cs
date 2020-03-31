@@ -1,7 +1,9 @@
-﻿using System;
+﻿using Newtonsoft.Json.Serialization;
+using System;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -15,10 +17,12 @@ namespace jNet.RPC.Client
         private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
         private readonly SemaphoreSlim _messageHandledSemaphore = new SemaphoreSlim(1);
 
-        public ClientCommunicator() : base(new ClientReferenceResolver())
+        public TypeNameBinder DefaultBinder { get; protected set; }
+
+        public ClientCommunicator(ISerializationBinder serializationBinder) : base(new ClientReferenceResolver())
         {
-            ((ClientReferenceResolver)ReferenceResolver).ReferenceFinalized += Resolver_ReferenceFinalized;                     
-        }        
+            ((ClientReferenceResolver)ReferenceResolver).ReferenceFinalized += Resolver_ReferenceFinalized;
+        }                
 
         protected override void OnDispose()
         {
@@ -45,6 +49,53 @@ namespace jNet.RPC.Client
                 0,
                 null));
         }
+
+        private T Deserialize<T>(SocketMessage message)
+        {
+            using (var valueStream = message.ValueStream)
+            {
+                if (valueStream == null)
+                {
+                    if (message.MessageType == SocketMessage.SocketMessageType.Query)
+                        Logger.Debug("Value stream null! {0}", message.MessageGuid);
+                    return default;
+                }
+
+
+                using (var reader = new StreamReader(valueStream))
+                {
+                    var obj = (T)Serializer.Deserialize(reader, typeof(T));
+                    if (obj is ProxyObjectBase target)
+                    {
+                        var source = ((ClientReferenceResolver)ReferenceResolver).ProxiesToPopulate.FirstOrDefault(p => p.DtoGuid == target.DtoGuid);
+                        if (source == null)
+                            return obj;
+                        try
+                        {
+                            valueStream.Position = 0;
+                            Serializer.Populate(reader, target);
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error(ex, "Error when populating {0}:{1}", source.DtoGuid, target.DtoGuid);
+                        }
+                        finally
+                        {
+                            ((ClientReferenceResolver)ReferenceResolver).ProxiesToPopulate.Remove(source);
+                        }
+                    }
+                    if (obj == null && message.MemberName.Contains("GetSucc"))
+                    {
+                        valueStream.Position = 0;
+                        Logger.Debug("NULL ON DESERIALIZE! {0}:{1}:{2}", message.DtoGuid, message.ValueString, reader.ReadToEnd());
+                    }
+
+
+                    return obj;
+                }
+
+            }
+        }        
 
         protected override void EnqueueMessage(SocketMessage message)
         {
@@ -150,52 +201,33 @@ namespace jNet.RPC.Client
                 }               
             }
         }        
-
-        private T Deserialize<T>(SocketMessage message)
+        
+        public async Task<bool> Connect(string address)
         {
-            using (var valueStream = message.ValueStream)
-            {
-                if (valueStream == null)
-                {
-                    if (message.MessageType == SocketMessage.SocketMessageType.Query)
-                        Logger.Debug("Value stream null! {0}", message.MessageGuid);
-                    return default;
-                }
-                    
-             
-                using (var reader = new StreamReader(valueStream))
-                {
-                    var obj = (T)Serializer.Deserialize(reader, typeof(T));
-                    if (obj is ProxyObjectBase target)
-                    {
-                        var source = ((ClientReferenceResolver)ReferenceResolver).ProxiesToPopulate.FirstOrDefault(p => p.DtoGuid == target.DtoGuid);
-                        if (source == null)
-                            return obj;
-                        try
-                        {
-                            valueStream.Position = 0;
-                            Serializer.Populate(reader, target);
-                        }
-                        catch(Exception ex)
-                        {
-                            Logger.Error(ex, "Error when populating {0}:{1}", source.DtoGuid, target.DtoGuid);
-                        }
-                        finally
-                        {
-                            ((ClientReferenceResolver)ReferenceResolver).ProxiesToPopulate.Remove(source);
-                        }                        
-                    }
-                    if (obj == null && message.MemberName.Contains("GetSucc"))
-                    {
-                        valueStream.Position = 0;
-                        Logger.Debug("NULL ON DESERIALIZE! {0}:{1}:{2}", message.DtoGuid, message.ValueString, reader.ReadToEnd());
-                    }
-                        
+            var port = 1060;
+            var addressParts = address.Split(':');
+            if (addressParts.Length > 1)
+                int.TryParse(addressParts[1], out port);
 
-                    return obj;                    
-                }
-                    
+            Client = new TcpClient
+            {
+                NoDelay = true,
+            };
+
+            try
+            {
+                await Client.ConnectAsync(addressParts[0], port).ConfigureAwait(false);
+                Logger.Info("Connection opened to {0}:{1}.", addressParts[0], port);                            
+
+                StartThreads();
+                return true;
             }
-        }
+            catch
+            {
+                Client.Close();
+                RaiseDisconnected(this, EventArgs.Empty);
+            }
+            return false;
+        }        
     }
 }

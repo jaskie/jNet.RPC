@@ -15,15 +15,15 @@ namespace jNet.RPC.Server.Tests
         [TestMethod()]
         public void InitializeTest_PortAbove1023()
         {
-            var _serverHost = new ServerHost() { ListenPort = 1024 };                        
-            Assert.IsTrue(_serverHost.Initialize(new MockServerObject(), PrincipalProvider.Default), "ServerHost did not initiated correctly");
+            var _serverHost = new ServerHost(1024, new MockServerObject());                        
+            Assert.IsTrue(_serverHost.Start(), "ServerHost did not initiated correctly");
         }
 
         [TestMethod()]
         public void InitializeTest_PortUnder1024()
         {
-            var _serverHost = new ServerHost() { ListenPort = 1023 };
-            Assert.IsFalse(_serverHost.Initialize(new MockServerObject(), PrincipalProvider.Default), "ServerHost initiated with port <1024");
+            var _serverHost = new ServerHost(1023, new MockServerObject());
+            Assert.IsFalse(_serverHost.Start(), "ServerHost initiated with port <1024");
         }
     }
 }

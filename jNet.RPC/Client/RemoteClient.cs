@@ -1,13 +1,23 @@
 ﻿using System;
+using System.Reflection;
 using Newtonsoft.Json.Serialization;
 
 namespace jNet.RPC.Client
 {
     public class RemoteClient : ClientCommunicator
     {
-        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();               
+        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();                       
 
-        public ISerializationBinder Binder { set => SetBinder(value); }
+        public RemoteClient(ISerializationBinder binder = null) : base(binder)
+        {
+            if (binder == null)
+            {
+                DefaultBinder = new TypeNameBinder(Assembly.GetCallingAssembly());
+                Serializer.SerializationBinder = DefaultBinder;
+            }
+            else
+                Serializer.SerializationBinder = binder;                
+        }
 
         public T GetRootObject<T>()
         {

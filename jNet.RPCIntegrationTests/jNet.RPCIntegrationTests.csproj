@@ -45,22 +45,46 @@
     <Reference Include="Microsoft.VisualStudio.TestPlatform.TestFramework.Extensions, Version=14.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\MSTest.TestFramework.2.1.0\lib\net45\Microsoft.VisualStudio.TestPlatform.TestFramework.Extensions.dll</HintPath>
     </Reference>
+    <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.12.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Client\ClientObjectBaseTests.cs" />
+    <Compile Include="Communication\CommunicationTests.cs" />
+    <Compile Include="Communication\ResolvingProxyTypeTests.cs" />
+    <Compile Include="Model\Client\MockMember.cs" />
+    <Compile Include="Model\Client\MockRoot.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\jNet.RPC.Client\jNet.RPC.ClientLib.csproj">
+      <Project>{616a9284-3533-4633-aa2f-f2d2ed35366d}</Project>
+      <Name>jNet.RPC.ClientLib</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\jNet.RPC.Common\jNet.RPC.CommonLib.csproj">
+      <Project>{E96D730C-5083-446D-ADB1-9621D67B2867}</Project>
+      <Name>jNet.RPC.CommonLib</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\jNet.RPC.Server\jNet.RPC.ServerLib.csproj">
+      <Project>{E516F99F-4BAA-4BBD-85B2-C5BBD7DAA312}</Project>
+      <Name>jNet.RPC.ServerLib</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\jNet.RPCUnitTests\jNet.RPC.UnitTests.csproj">
+      <Project>{49534E5C-22CF-49F1-A4FC-FA3F91993A09}</Project>
+      <Name>jNet.RPC.UnitTests</Name>
+    </ProjectReference>
     <ProjectReference Include="..\jNet.RPC\jNet.RPC.csproj">
       <Project>{15324B69-7D18-49F3-9141-B024079356E8}</Project>
       <Name>jNet.RPC</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets" Condition="Exists('$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets')" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

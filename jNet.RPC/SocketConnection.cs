@@ -11,7 +11,6 @@ using Newtonsoft.Json.Serialization;
 
 namespace jNet.RPC
 {
-
     /// <inheritdoc />
     /// <summary>
     /// Class to ensure non-blocking send and preserving order of messages
@@ -20,22 +19,20 @@ namespace jNet.RPC
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private int _disposed;
-        private readonly ConcurrentQueue<byte[]> _sendQueue = new ConcurrentQueue<byte[]>();
-        
-        protected readonly ConcurrentQueue<SocketMessage> _unresolvedQueue = new ConcurrentQueue<SocketMessage>();
+        private readonly ConcurrentQueue<byte[]> _sendQueue = new ConcurrentQueue<byte[]>();                
 
         private readonly int _maxQueueSize;
         private Thread _readThread;
         private Thread _writeThread;
 
-        private readonly AutoResetEvent _sendAutoResetEvent = new AutoResetEvent(false);
-        protected readonly SemaphoreSlim _messageReceivedSempahore = new SemaphoreSlim(0);
-        private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
+        private readonly AutoResetEvent _sendAutoResetEvent = new AutoResetEvent(false);        
+        private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();        
 
-        public TcpClient Client { get; private set; }
+        public TcpClient Client { get; protected set; }
         public JsonSerializer Serializer { get; } 
-       
+        
         protected IReferenceResolver ReferenceResolver { get; }
+        protected readonly SemaphoreSlim _messageReceivedSempahore = new SemaphoreSlim(0);
 
         protected SocketConnection(TcpClient client, IReferenceResolver referenceResolver)
         {
@@ -69,39 +66,7 @@ namespace jNet.RPC
                 Formatting = Formatting.Indented
 #endif
             });
-        }
-
-        public async Task<bool> Connect(string address)
-        {
-            var port = 1060;
-            var addressParts = address.Split(':');
-            if (addressParts.Length > 1)
-                int.TryParse(addressParts[1], out port);
-
-            Client = new TcpClient
-            {
-                NoDelay = true,                
-            };
-
-            try
-            {
-                await Client.ConnectAsync(addressParts[0], port).ConfigureAwait(false);
-                Logger.Info("Connection opened to {0}:{1}.", addressParts[0], port);
-                StartThreads();
-                return true;
-            }
-            catch
-            {
-                Client.Close();
-                Disconnected?.Invoke(this, EventArgs.Empty);
-            }
-            return false;
-        }
-
-        protected void SetBinder(ISerializationBinder binder)
-        {
-            Serializer.SerializationBinder = binder;
-        }
+        }                
 
         internal void Send(SocketMessage message)
         {
@@ -170,8 +135,13 @@ namespace jNet.RPC
         }
        
         public event EventHandler Disconnected;
+        protected void RaiseDisconnected(object sender, EventArgs e)
+        {
+            Disconnected?.Invoke(sender, e);
+        }
         protected abstract void EnqueueMessage(SocketMessage message);
         protected abstract Task MessageHandlerProc();
+       
         protected virtual void WriteThreadProc()
         {
             while (IsConnected)
@@ -199,7 +169,6 @@ namespace jNet.RPC
                 }
             }
         }
-
         protected virtual void ReadThreadProc()
         {
             var stream = Client.GetStream();
