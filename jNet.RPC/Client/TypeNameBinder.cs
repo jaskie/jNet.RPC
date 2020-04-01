@@ -20,10 +20,10 @@ namespace jNet.RPC.Client
 
         public void AddProxyTypeAssignment(string sourceTypeFullName, Type t)
         {
-            _typesDictionary.TryAdd(sourceTypeFullName, t);
+            var test = _typesDictionary.TryAdd(sourceTypeFullName, t);
         }
 
-        public void AddProxyAssemblies(string assemblyName)
+        public void AddProxyAssembly(string assemblyName)
         {
             _assemblies.Add(assemblyName);
         }
@@ -61,14 +61,8 @@ namespace jNet.RPC.Client
 
                             ++localAccuracy;                            
                         }
-
-                        if (localAccuracy == localNamespaces.Count)
-                        {
-                            Debug.WriteLine($"Source: {typeFullName}");
-                            Debug.WriteLine($"Found proxy type: {type.FullName}, Accuracy: {localAccuracy}");
-                            return type;
-                        }                            
-                        else if (localAccuracy > accuracy)
+                                       
+                        if (localAccuracy > accuracy)
                         {
                             accuracy = localAccuracy;
                             foundType = type;

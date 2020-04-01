@@ -1,7 +1,6 @@
 ﻿using jNet.RPC.Client;
 using jNet.RPC.Server;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System.Reflection;
 using System.Threading.Tasks;
 using Tests.CommonLibrary;
 
@@ -20,11 +19,11 @@ namespace jNet.RPC.IntegrationTests.Communication
         {  
             _mockObject = new Tests.ServerLibrary.MockRoot();
             
-            _server = new ServerHost(1024, _mockObject);            
+            _server = new ServerHost(1100, _mockObject);            
             _server.Start();
 
             _client = new RemoteClient();
-            await _client.Connect("127.0.0.1:1024");
+            await _client.Connect("127.0.0.1:1100");
         }
 
         [ClassCleanup]
