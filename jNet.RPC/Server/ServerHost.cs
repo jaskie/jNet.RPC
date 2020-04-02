@@ -20,7 +20,7 @@ namespace jNet.RPC.Server
         private readonly List<ServerSession> _clients = new List<ServerSession>();
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
                 
-        public ushort ListenPort { get; set; }
+        public ushort ListenPort { get; private set; }
 
         public ServerHost(ushort listenPort, ServerObjectBase rootObject, IPrincipalProvider principalProvider = null)
         {

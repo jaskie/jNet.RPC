@@ -28,7 +28,7 @@ namespace jNet.RPC.Client
             _assemblies.Add(assemblyName);
         }
 
-        private Type RegisterType(string typeFullName)
+        private Type FindType(string typeFullName, string assemblyName)
         {
             var sourceNamespaces = typeFullName.Split('.');
             int accuracy = 0;
@@ -79,14 +79,14 @@ namespace jNet.RPC.Client
             }
             else
             {
-                Debug.WriteLine($"Could not find proxy type: {typeFullName}");
-                return Type.GetType($"{typeFullName}", true);
+                Debug.WriteLine($"Could not find proxy type, returning based on TypeName and AssemblyName: {typeFullName}, {assemblyName}");
+                return Type.GetType($"{typeFullName}, {assemblyName}", true);
             }            
         }
 
         public Type BindToType(string assemblyName, string typeName)
         {
-            return _typesDictionary.GetOrAdd(typeName, RegisterType);                                    
+            return _typesDictionary.GetOrAdd(typeName, (x) => { return FindType(x, assemblyName); });                                    
         }
 
         public void BindToName(Type serializedType, out string assemblyName, out string typeName)
