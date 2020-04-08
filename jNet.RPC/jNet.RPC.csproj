@@ -66,11 +66,13 @@
     <Compile Include="Client\MessageRequest.cs" />
     <Compile Include="Client\ProxyObjectBaseEventArgs.cs" />
     <Compile Include="Client\ClientCommunicator.cs" />
-    <Compile Include="Client\TypeNameBinder.cs" />
+    <Compile Include="Client\DefaultSerializationBinder.cs" />
+    <Compile Include="DtoClassAttribute.cs" />
     <Compile Include="DtoMemberAttribute.cs" />
     <Compile Include="IRemoteHostConfig.cs" />
     <Compile Include="PropertyChangedWithValueEventArgs.cs" />
     <Compile Include="SerializationContractResolver.cs" />
+    <Compile Include="Server\DefaultSerializationBinder.cs" />
     <Compile Include="Server\IPrincipalProvider.cs" />
     <Compile Include="Server\PrincipalProvider.cs" />
     <Compile Include="Server\ServerReferenceResolver.cs" />

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using Tests.CommonLibrary;
 
 namespace Tests.ClientLibrary.Level1.Level2.Level3
-{
+{    
     public class MockRoot : ProxyObjectBase, IMockRoot
     {
 #pragma warning disable CS0649

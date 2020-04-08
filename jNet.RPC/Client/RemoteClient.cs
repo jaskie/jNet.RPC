@@ -12,7 +12,7 @@ namespace jNet.RPC.Client
         {
             if (binder == null)
             {
-                DefaultBinder = new TypeNameBinder(Assembly.GetCallingAssembly());
+                DefaultBinder = new DefaultSerializationBinder(Assembly.GetCallingAssembly());
                 Serializer.SerializationBinder = DefaultBinder;
             }
             else

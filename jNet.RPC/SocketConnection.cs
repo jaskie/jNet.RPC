@@ -45,7 +45,8 @@ namespace jNet.RPC
                 ContractResolver = new SerializationContractResolver(),
                 ReferenceResolverProvider = () => referenceResolver,
                 TypeNameHandling = TypeNameHandling.Objects,
-                Context = new StreamingContext(StreamingContextStates.Remoting),
+                Context = new StreamingContext(StreamingContextStates.Remoting), 
+                
 #if DEBUG
                 Formatting = Formatting.Indented
 #endif

@@ -29,7 +29,8 @@ namespace jNet.RPC.Server
         public ServerSession(TcpClient client, IDto initialObject, IPrincipalProvider principalProvider): base(client, new ServerReferenceResolver())
         {
             _initialObject = initialObject;
-           
+            Serializer.SerializationBinder = new DefaultSerializationBinder();
+
             if (!(client.Client.RemoteEndPoint is IPEndPoint))
                 throw new UnauthorizedAccessException("Client RemoteEndpoint is invalid");
             _sessionUser = principalProvider.GetPrincipal(client);

@@ -17,7 +17,7 @@ namespace jNet.RPC.Client
         private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
         private readonly SemaphoreSlim _messageHandledSemaphore = new SemaphoreSlim(1);
 
-        public TypeNameBinder DefaultBinder { get; protected set; }
+        public DefaultSerializationBinder DefaultBinder { get; protected set; }
 
         public ClientCommunicator(ISerializationBinder serializationBinder) : base(new ClientReferenceResolver())
         {

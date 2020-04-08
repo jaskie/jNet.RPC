@@ -14,8 +14,7 @@ namespace jNet.RPC.IntegrationTests.Communication
         {
             yield return new object[] { new ServerHost(1024, new Tests.ServerLibrary.MockRoot()), new RemoteClient(), typeof(Model.Client.MockRoot) };
             yield return new object[] { new ServerHost(1025, new Tests.ServerLibrary.Level1.MockRoot()), new RemoteClient(), typeof(Model.Client.MockRoot) };
-            yield return new object[] { new ServerHost(1026, new Tests.ServerLibrary.Level1.Level2.MockRoot()), new RemoteClient(), typeof(Model.Client.MockRoot) };
-            yield return new object[] { new ServerHost(1027, new Tests.ServerLibrary.Level1.Level2.Level3.MockRoot()), new RemoteClient(), typeof(Model.Client.MockRoot) };
+            yield return new object[] { new ServerHost(1026, new Tests.ServerLibrary.Level1.Level2.MockRoot()), new RemoteClient(), typeof(Model.Client.MockRoot) };            
         }        
 
         [TestMethod]
@@ -35,7 +34,7 @@ namespace jNet.RPC.IntegrationTests.Communication
             yield return new object[] { new ServerHost(1028, new Tests.ServerLibrary.MockRoot()), new RemoteClient(), typeof(Model.Client.MockRoot) };
             yield return new object[] { new ServerHost(1029, new Tests.ServerLibrary.Level1.MockRoot()), new RemoteClient(), typeof(Tests.ClientLibrary.Level1.MockRoot) };
             yield return new object[] { new ServerHost(1030, new Tests.ServerLibrary.Level1.Level2.MockRoot()), new RemoteClient(), typeof(Tests.ClientLibrary.Level1.Level2.MockRoot) };
-            yield return new object[] { new ServerHost(1031, new Tests.ServerLibrary.Level1.Level2.Level3.MockRoot()), new RemoteClient(), typeof(Tests.ClientLibrary.Level1.Level2.Level3.MockRoot) };
+            yield return new object[] { new ServerHost(1035, new Tests.ServerLibrary.Level1.Level2.Level3.MockRoot()), new RemoteClient(), typeof(Tests.ClientLibrary.Level1.MockRoot) };
         }
 
         [TestMethod]
@@ -56,8 +55,7 @@ namespace jNet.RPC.IntegrationTests.Communication
         {
             yield return new object[] { new ServerHost(1032, new Tests.ServerLibrary.MockRoot()), new RemoteClient(), typeof(Tests.ServerLibrary.MockRoot), typeof(Model.Client.MockRoot) };
             yield return new object[] { new ServerHost(1033, new Tests.ServerLibrary.Level1.MockRoot()), new RemoteClient(), typeof(Tests.ServerLibrary.Level1.MockRoot), typeof(Tests.ClientLibrary.Level1.Level2.Level3.MockRoot) };
-            yield return new object[] { new ServerHost(1034, new Tests.ServerLibrary.Level1.Level2.MockRoot()), new RemoteClient(), typeof(Tests.ServerLibrary.Level1.Level2.MockRoot), typeof(Tests.ClientLibrary.Level1.MockRoot) };
-            yield return new object[] { new ServerHost(1035, new Tests.ServerLibrary.Level1.Level2.Level3.MockRoot()), new RemoteClient(), typeof(Tests.ServerLibrary.Level1.Level2.Level3.MockRoot), typeof(Tests.ClientLibrary.Level1.Level2.MockRoot) };
+            yield return new object[] { new ServerHost(1034, new Tests.ServerLibrary.Level1.Level2.MockRoot()), new RemoteClient(), typeof(Tests.ServerLibrary.Level1.Level2.MockRoot), typeof(Tests.ClientLibrary.Level1.MockRoot) };            
         }
 
         [TestMethod]

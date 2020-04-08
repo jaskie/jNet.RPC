@@ -5,6 +5,7 @@ using Tests.CommonLibrary;
 
 namespace Tests.ClientLibrary.Level1
 {
+    [DtoClass(nameof(IMockRoot))]
     public class MockRoot : ProxyObjectBase, IMockRoot
     {
 #pragma warning disable CS0649
