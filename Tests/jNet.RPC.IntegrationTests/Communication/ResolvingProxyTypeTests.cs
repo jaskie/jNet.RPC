@@ -25,6 +25,10 @@ namespace jNet.RPC.IntegrationTests.Communication
             client.Connect($"127.0.0.1:{server.ListenPort}").Wait();
 
             var proxy = client.GetRootObject<IMockRoot>();
+
+            server.Dispose();
+            client.Dispose();
+
             Assert.IsNotNull(proxy, "GetRootObject returned null!");
             Assert.IsTrue(proxy.GetType() == expectedType, $"Returned type not expected! {proxy} : {expectedType}");
         }
@@ -34,7 +38,7 @@ namespace jNet.RPC.IntegrationTests.Communication
             yield return new object[] { new ServerHost(1028, new Tests.ServerLibrary.MockRoot()), new RemoteClient(), typeof(Model.Client.MockRoot) };
             yield return new object[] { new ServerHost(1029, new Tests.ServerLibrary.Level1.MockRoot()), new RemoteClient(), typeof(Tests.ClientLibrary.Level1.MockRoot) };
             yield return new object[] { new ServerHost(1030, new Tests.ServerLibrary.Level1.Level2.MockRoot()), new RemoteClient(), typeof(Tests.ClientLibrary.Level1.Level2.MockRoot) };
-            yield return new object[] { new ServerHost(1035, new Tests.ServerLibrary.Level1.Level2.Level3.MockRoot()), new RemoteClient(), typeof(Tests.ClientLibrary.Level1.MockRoot) };
+            yield return new object[] { new ServerHost(1035, new Tests.ServerLibrary.Level1.Level2.Level3.MockRoot()), new RemoteClient(), typeof(Tests.ClientLibrary.Level1.MockRoot) }; //DtoClass Interface TestData
         }
 
         [TestMethod]
@@ -47,6 +51,10 @@ namespace jNet.RPC.IntegrationTests.Communication
             client.Connect($"127.0.0.1:{server.ListenPort}").Wait();
 
             var proxy = client.GetRootObject<IMockRoot>();
+            
+            server.Dispose();
+            client.Dispose();
+            
             Assert.IsNotNull(proxy, "GetRootObject returned null!");
             Assert.IsTrue(proxy.GetType() == expectedType, $"Returned type not expected! {proxy} : {expectedType}");
         }
@@ -68,6 +76,10 @@ namespace jNet.RPC.IntegrationTests.Communication
             client.Connect($"127.0.0.1:{server.ListenPort}").Wait();
 
             var proxy = client.GetRootObject<IMockRoot>();
+
+            server.Dispose();
+            client.Dispose();
+
             Assert.IsNotNull(proxy, "GetRootObject returned null!");
             Assert.IsTrue(proxy.GetType() == expectedType, $"Returned wrong type! {proxy} : {expectedType}");
         }
