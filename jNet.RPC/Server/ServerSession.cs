@@ -22,19 +22,17 @@ namespace jNet.RPC.Server
         private readonly IDto _initialObject;
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
-        protected readonly ConcurrentQueue<SocketMessage> _receiveQueue = new ConcurrentQueue<SocketMessage>();
-        private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();               
-                protected readonly SemaphoreSlim _messageReceivedSempahore = new SemaphoreSlim(0);
+        private readonly BlockingCollection<SocketMessage> _receiveQueue = new BlockingCollection<SocketMessage>(new ConcurrentQueue<SocketMessage>());
 
         public ServerSession(TcpClient client, IDto initialObject, IPrincipalProvider principalProvider): base(client, new ServerReferenceResolver())
         {
-            _initialObject = initialObject;
-           
+            _initialObject = initialObject;           
             if (!(client.Client.RemoteEndPoint is IPEndPoint))
                 throw new UnauthorizedAccessException("Client RemoteEndpoint is invalid");
             _sessionUser = principalProvider.GetPrincipal(client);
             if (_sessionUser == null)
                 throw new UnauthorizedAccessException($"Client {Client.Client.RemoteEndPoint} not allowed");
+            Logger.Info("Client {0} from {1} successfully connected", _sessionUser.Identity, Client.Client.RemoteEndPoint);
             ((ServerReferenceResolver)ReferenceResolver).ReferencePropertyChanged += ReferenceResolver_ReferencePropertyChanged;
             StartThreads();           
         }
@@ -60,39 +58,22 @@ namespace jNet.RPC.Server
 
         internal override void EnqueueMessage(SocketMessage message)
         {
-            _receiveQueue.Enqueue(message);
-            _messageReceivedSempahore.Release();
-        }        
+            _receiveQueue.Add(message);
+        }
 
         protected override void MessageHandlerProc()
         {
             Thread.CurrentPrincipal = _sessionUser;
 
-            while (!_cancellationTokenSource.IsCancellationRequested)
+            while (!CancellationTokenSource.IsCancellationRequested)
             {
                 try
                 {
-                    _messageReceivedSempahore.Wait(_cancellationTokenSource.Token);
-                }
-                catch (OperationCanceledException)
-                {
-                    return;
-                }
-                if (!_receiveQueue.TryDequeue(out var message))
-                {
-                    Logger.Error("Empty message queue when semaphore reset");
-                    continue;
-                }
-
-                if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
-                    Logger.Trace("Processing message: {0}:{1}", message.MessageGuid, message.DtoGuid);
-                
-                try
-                {
+                    var message = _receiveQueue.Take(CancellationTokenSource.Token);
+                    if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
+                        Logger.Trace("Processing message: {0}:{1}", message.MessageGuid, message.DtoGuid);
                     if (message.MessageType == SocketMessage.SocketMessageType.RootQuery)
-                    {
                         SendResponse(message, _initialObject);
-                    }                    
                     else // method of particular object
                     {
                         var objectToInvoke = ((ServerReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
@@ -123,8 +104,6 @@ namespace jNet.RPC.Server
                                             SendException(message, e);
                                             throw;
                                         }
-                                        if (response == null)
-                                            Logger.Warn("Query response NULL! {0}", message.MessageGuid);
                                         SendResponse(message, response);
                                     }
                                     else
@@ -195,7 +174,7 @@ namespace jNet.RPC.Server
                                     ((ServerReferenceResolver)ReferenceResolver).RestoreReference(objectToInvoke);
                                     break;
                             }
-                        }                        
+                        }
                         else
                         {
                             Logger.Debug("Dto send by client not found! {0}", message.DtoGuid);
@@ -203,11 +182,15 @@ namespace jNet.RPC.Server
                         }
                     }
                 }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"Exception while handling message. {ex.Message}");
                     Logger.Error(ex);
-                }                                
+                }
             }
         }
 
@@ -221,7 +204,7 @@ namespace jNet.RPC.Server
         protected override void OnDispose()
         {
             base.OnDispose();
-            _cancellationTokenSource.Cancel();           
+            _receiveQueue.Dispose();
             ((ServerReferenceResolver)ReferenceResolver).ReferencePropertyChanged -= ReferenceResolver_ReferencePropertyChanged;
             lock (((IDictionary) _delegates).SyncRoot)
             {

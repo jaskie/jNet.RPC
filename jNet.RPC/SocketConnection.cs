@@ -20,26 +20,24 @@ namespace jNet.RPC
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private int _disposed;
-        private readonly ConcurrentQueue<byte[]> _sendQueue = new ConcurrentQueue<byte[]>();        
+        private readonly BlockingCollection<byte[]> _sendQueue; 
 
-        private readonly int _maxQueueSize;
         private Thread _readThread;
         private Thread _writeThread;
-
-        private readonly SemaphoreSlim _sendSemaphore = new SemaphoreSlim(0);
-        private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
 
         public TcpClient Client { get; private set; }
         public JsonSerializer Serializer { get; } 
        
         protected IReferenceResolver ReferenceResolver { get; }
 
+        protected CancellationTokenSource CancellationTokenSource { get; } = new CancellationTokenSource();
+
         protected SocketConnection(TcpClient client, IReferenceResolver referenceResolver)
         {
             Client = client;
             client.NoDelay = true;
             ReferenceResolver = referenceResolver;
-            _maxQueueSize = 0x1000;
+            _sendQueue = new BlockingCollection<byte[]>(0x1000);
             Serializer = JsonSerializer.CreateDefault(new JsonSerializerSettings
             {
                 ContractResolver = new SerializationContractResolver(),
@@ -55,7 +53,7 @@ namespace jNet.RPC
         protected SocketConnection(IReferenceResolver referenceResolver)
         {
             ReferenceResolver = referenceResolver;
-            _maxQueueSize = 0x10000;
+            _sendQueue = new BlockingCollection<byte[]>(0x10000);
             Serializer = JsonSerializer.CreateDefault(new JsonSerializerSettings
             {
                 ContractResolver = new SerializationContractResolver(),
@@ -106,36 +104,37 @@ namespace jNet.RPC
                 return;
             try
             {
-                if (_sendQueue.Count < _maxQueueSize)
+                var serializedData = message.MessageType == SocketMessage.SocketMessageType.EventNotification
+                    ? SerializeEventArgs(message.Value)
+                    : SerializeDto(message.Value);
+                if (!_sendQueue.TryAdd(message.Encode(serializedData)))
                 {
-                    var serializedData = message.MessageType == SocketMessage.SocketMessageType.EventNotification
-                        ? SerializeEventArgs(message.Value)
-                        : SerializeDto(message.Value);
-                    _sendQueue.Enqueue(message.Encode(serializedData));
-                    if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
-                        Logger.Debug("Message queued to send {0}:{1}:{2}", message.MessageGuid, message.DtoGuid, message.MessageType);                    
-                    _sendSemaphore.Release();
+                    Logger.Error("Message queue overflow");
+                    NotifyDisconnection();
                     return;
                 }
-                Logger.Error("Message queue overflow");
+                if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
+                    Logger.Trace("Message queued to send {0}:{1}:{2}", message.MessageGuid, message.DtoGuid, message.MessageType);
             }
             catch (Exception e)
             {
                 Logger.Error(e);
+                NotifyDisconnection();
             }
-            NotifyDisconnection();
         }
-
-
 
         public bool IsConnected { get; private set; } = true;
         
         protected virtual void OnDispose()
         {
-            IsConnected = false;
+            if (!CancellationTokenSource.IsCancellationRequested)
+                CancellationTokenSource.Cancel();
             Client.Client?.Dispose();
-            _sendSemaphore.Release();
-            _sendSemaphore.Dispose();
+            _readThread?.Join();
+            _writeThread?.Join();
+            _sendQueue.Dispose();
+            CancellationTokenSource.Dispose();
+            IsConnected = false;
             Logger.Info("Connection closed.");
         }
 
@@ -170,20 +169,14 @@ namespace jNet.RPC
         protected abstract void MessageHandlerProc();
         protected virtual void WriteThreadProc()
         {
-            while (IsConnected)
+            while (!CancellationTokenSource.IsCancellationRequested)
             {
                 try
                 {
-                    _sendSemaphore.Wait(_cancellationTokenSource.Token);
-                    if (!_sendQueue.TryDequeue(out var serializedMessage))
-                    {
-                        Logger.Error("Empty send queue when semaphore reset");
-                        continue;
-                    }
+                    var serializedMessage = _sendQueue.Take(CancellationTokenSource.Token);
                     Client.Client.Send(serializedMessage);
                 }
-                catch (Exception e) when (e is IOException || e is ArgumentNullException ||
-                                          e is ObjectDisposedException || e is SocketException)
+                catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is SocketException || e is OperationCanceledException)
                 {
                     NotifyDisconnection();
                     return;
@@ -202,7 +195,7 @@ namespace jNet.RPC
             var sizeBuffer = new byte[sizeof(int)];
             var dataIndex = 0;
 
-            while (IsConnected)
+            while (!CancellationTokenSource.IsCancellationRequested)
             {
                 try
                 {
@@ -243,12 +236,12 @@ namespace jNet.RPC
             }
         }
 
-        private void NotifyDisconnection()
+        protected void NotifyDisconnection()
         {
             if (!IsConnected)
                 return;
             IsConnected = false;
-            Disconnected?.Invoke(this, EventArgs.Empty);
+            Task.Run(() => Disconnected?.Invoke(this, EventArgs.Empty));  //move the notifier out of calling  thread
         }
 
         private Stream SerializeEventArgs(object eventArgs)

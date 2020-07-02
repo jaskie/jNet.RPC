@@ -10,10 +10,8 @@ namespace jNet.RPC.Client
     public abstract class ClientSession : SocketConnection
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();       
-        private readonly ConcurrentQueue<SocketMessage> _receiveQueue = new ConcurrentQueue<SocketMessage>();
+        private readonly BlockingCollection<SocketMessage> _receiveQueue = new BlockingCollection<SocketMessage>(new ConcurrentQueue<SocketMessage>());
         private readonly ConcurrentDictionary<Guid, MessageRequest> _requests = new ConcurrentDictionary<Guid, MessageRequest>();        
-        private readonly CancellationTokenSource _shutdownCancellationTokenSource = new CancellationTokenSource();
-        private readonly SemaphoreSlim _messageReceivedSempahore = new SemaphoreSlim(0); 
         private readonly ConcurrentQueue<SocketMessage> _unresolvedQueue = new ConcurrentQueue<SocketMessage>();
 
 
@@ -25,9 +23,9 @@ namespace jNet.RPC.Client
 
         protected override void OnDispose()
         {
-            _shutdownCancellationTokenSource.Cancel();
             ((ClientReferenceResolver)ReferenceResolver).Dispose();
             base.OnDispose();
+            _receiveQueue.Dispose();
         }
 
         private void Resolver_ReferenceFinalized(object sender, ProxyObjectBaseEventArgs e)
@@ -51,55 +49,50 @@ namespace jNet.RPC.Client
 
         internal override void EnqueueMessage(SocketMessage message)
         {
-            _receiveQueue.Enqueue(message);
-            _messageReceivedSempahore.Release();
+            _receiveQueue.Add(message);
         }
 
         internal T SendAndGetResponse<T>(SocketMessage query)
         {
-            using (var messageRequest = new MessageRequest())
+            try
             {
-                _requests.TryAdd(query.MessageGuid, messageRequest);
-                Send(query);
-                var response = messageRequest.WaitForResult();
-
-                if (!_requests.TryRemove(query.MessageGuid, out var _))
+                using (var messageRequest = new MessageRequest())
                 {
-                    Logger.Warn("SendAndGetResponse client trapped! {0}:{1}", response.MessageGuid, response.MessageType);
-                    return default;
+                    _requests.TryAdd(query.MessageGuid, messageRequest);
+                    Send(query);
+                    var response = messageRequest.WaitForResult(CancellationTokenSource.Token);
+
+                    if (!_requests.TryRemove(query.MessageGuid, out var _))
+                    {
+                        Logger.Warn("SendAndGetResponse client trapped! {0}:{1}", response.MessageGuid, response.MessageType);
+                        return default;
+                    }
+
+                    if (response.MessageType == SocketMessage.SocketMessageType.Exception)
+                        throw Deserialize<Exception>(response);
+
+                    var result = Deserialize<T>(response);
+
+                    if (result == null)
+                        Logger.Debug("Returned null. MessageGuid {0}:", query.MessageGuid);
+
+                    return result;
                 }
-
-                if (response.MessageType == SocketMessage.SocketMessageType.Exception)
-                    throw Deserialize<Exception>(response);
-
-                var result = Deserialize<T>(response);
-
-                if (result == null)
-                    Logger.Debug("Returned null. MessageGuid {0}:", query.MessageGuid);
-
-                return result;
+            }
+            catch (ObjectDisposedException)
+            {
+                NotifyDisconnection();
+                return default;
             }
         }
 
         protected override void MessageHandlerProc()
         {
-            while (!_shutdownCancellationTokenSource.IsCancellationRequested)
+            while (!CancellationTokenSource.IsCancellationRequested)
             {
                 try
                 {
-                    _messageReceivedSempahore.Wait(_shutdownCancellationTokenSource.Token);
-                }
-                catch (OperationCanceledException)
-                {
-                    return;
-                }
-                if (!_receiveQueue.TryDequeue(out var message))
-                {
-                    Logger.Error("Empty message queue when semaphore reset");
-                    continue;
-                }
-                try
-                {
+                    var message = _receiveQueue.Take(CancellationTokenSource.Token);
                     if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
                         Logger.Debug("Processing message: {0}:{1}:{2}:{3}", message.MessageGuid, message.DtoGuid, message.MemberName, message.ValueString);
 
@@ -127,13 +120,14 @@ namespace jNet.RPC.Client
                             break;
                     }
                 }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
                 catch (Exception ex)
                 {
-                    if (ex is OperationCanceledException)
-                        break;
                     Logger.Error(ex, "Unexpected error in MessageHandler");
                 }
-                continue;
             }
         }
 

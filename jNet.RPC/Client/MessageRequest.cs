@@ -19,9 +19,9 @@ namespace jNet.RPC.Client
             _mutex.Set();
         }
 
-        public SocketMessage WaitForResult()
+        public SocketMessage WaitForResult(CancellationToken token)
         {
-            _mutex.Wait();
+            _mutex.Wait(token);
             return _result;
         }
 
