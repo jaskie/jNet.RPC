@@ -30,12 +30,11 @@ namespace jNet.RPC
 
         private readonly byte[] _rawData;
         private readonly int _valueStartIndex;
-        private readonly object _value;
 
         internal SocketMessage(object value)
         {
             MessageGuid = Guid.NewGuid();
-            _value = value;
+            Value = value;
         }
 
         internal SocketMessage(SocketMessage originalMessage, object value)
@@ -44,7 +43,7 @@ namespace jNet.RPC
             MessageType = originalMessage.MessageType;
             DtoGuid = originalMessage.DtoGuid;
             MemberName = originalMessage.MemberName;
-            _value = value;
+            Value = value;
         }
 
         internal SocketMessage(byte[] rawData)
@@ -71,7 +70,7 @@ namespace jNet.RPC
             _rawData = rawData;
         }
 
-        public object Value => _value;
+        public object Value { get; }
 
         public readonly Guid MessageGuid;
         public Guid DtoGuid;

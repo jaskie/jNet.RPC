@@ -3,7 +3,7 @@ using Newtonsoft.Json.Serialization;
 
 namespace jNet.RPC.Client
 {
-    public class RemoteClient : ClientCommunicator
+    public class RemoteClient : ClientSession
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();               
 
@@ -14,7 +14,7 @@ namespace jNet.RPC.Client
             try
             {
                 var queryMessage = SocketMessage.Create(SocketMessage.SocketMessageType.RootQuery, null, null, 0, null);
-                var response = SendAndGetResponse<T>(queryMessage).Result;                
+                var response = SendAndGetResponse<T>(queryMessage);                
                 return response;
             }
             catch (Exception e)
@@ -34,7 +34,7 @@ namespace jNet.RPC.Client
                     methodName,
                     parameters.Length,
                     new SocketMessageArrayValue { Value = parameters });
-                return SendAndGetResponse<T>(queryMessage).Result;                
+                return SendAndGetResponse<T>(queryMessage);                
             }
             catch (Exception e)
             {
@@ -54,7 +54,7 @@ namespace jNet.RPC.Client
                     0,
                     null
                 );
-                return SendAndGetResponse<T>(queryMessage).Result;
+                return SendAndGetResponse<T>(queryMessage);
             }
             catch (Exception e)
             {
@@ -73,7 +73,7 @@ namespace jNet.RPC.Client
                     methodName,
                     parameters.Length,
                     new SocketMessageArrayValue { Value = parameters });
-                SendAndGetResponse<object>(queryMessage).Wait();
+                SendAndGetResponse<object>(queryMessage);
             }
             catch (Exception e)
             {
@@ -92,7 +92,7 @@ namespace jNet.RPC.Client
                 propertyName,
                 1,
                 value);
-                SendAndGetResponse<object>(queryMessage).Wait();
+                SendAndGetResponse<object>(queryMessage);
             }
             catch (Exception e)
             {
@@ -111,7 +111,7 @@ namespace jNet.RPC.Client
                 eventName,
                 0,
                 null);
-                SendAndGetResponse<object>(queryMessage).Wait();
+                SendAndGetResponse<object>(queryMessage);
             }
             catch (Exception e)
             {
@@ -130,7 +130,7 @@ namespace jNet.RPC.Client
                 eventName,
                 0,
                 null);
-                SendAndGetResponse<object>(queryMessage).Wait();
+                SendAndGetResponse<object>(queryMessage);
             }
             catch (Exception e)
             {

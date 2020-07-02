@@ -20,16 +20,13 @@ namespace jNet.RPC
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private int _disposed;
-        private readonly ConcurrentQueue<byte[]> _sendQueue = new ConcurrentQueue<byte[]>();
-        
-        protected readonly ConcurrentQueue<SocketMessage> _unresolvedQueue = new ConcurrentQueue<SocketMessage>();
+        private readonly ConcurrentQueue<byte[]> _sendQueue = new ConcurrentQueue<byte[]>();        
 
         private readonly int _maxQueueSize;
         private Thread _readThread;
         private Thread _writeThread;
 
-        private readonly AutoResetEvent _sendAutoResetEvent = new AutoResetEvent(false);
-        protected readonly SemaphoreSlim _messageReceivedSempahore = new SemaphoreSlim(0);
+        private readonly SemaphoreSlim _sendSemaphore = new SemaphoreSlim(0);
         private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
 
         public TcpClient Client { get; private set; }
@@ -117,7 +114,7 @@ namespace jNet.RPC
                     _sendQueue.Enqueue(message.Encode(serializedData));
                     if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
                         Logger.Debug("Message queued to send {0}:{1}:{2}", message.MessageGuid, message.DtoGuid, message.MessageType);                    
-                    _sendAutoResetEvent.Set();
+                    _sendSemaphore.Release();
                     return;
                 }
                 Logger.Error("Message queue overflow");
@@ -137,17 +134,16 @@ namespace jNet.RPC
         {
             IsConnected = false;
             Client.Client?.Dispose();
-            _sendAutoResetEvent.Set();
-            _sendAutoResetEvent.Dispose();
+            _sendSemaphore.Release();
+            _sendSemaphore.Dispose();
             Logger.Info("Connection closed.");
         }
 
         public void Dispose()
         {
-            if (Interlocked.Exchange(ref _disposed, 1) != default(int))
+            if (Interlocked.Exchange(ref _disposed, 1) != default)
                 return;
             OnDispose();
-            _cancellationTokenSource.Cancel();
         }
 
         protected void StartThreads()
@@ -170,22 +166,21 @@ namespace jNet.RPC
         }
        
         public event EventHandler Disconnected;
-        protected abstract void EnqueueMessage(SocketMessage message);
-        protected abstract Task MessageHandlerProc();
+        internal abstract void EnqueueMessage(SocketMessage message);
+        protected abstract void MessageHandlerProc();
         protected virtual void WriteThreadProc()
         {
             while (IsConnected)
             {
                 try
                 {
-                    _sendAutoResetEvent.WaitOne();
-                    while (!_sendQueue.IsEmpty)
-                    {                        
-                        if (!_sendQueue.TryDequeue(out var serializedMessage))
-                            continue;
-                                               
-                        Client.Client.Send(serializedMessage);                        
-                    }                                        
+                    _sendSemaphore.Wait(_cancellationTokenSource.Token);
+                    if (!_sendQueue.TryDequeue(out var serializedMessage))
+                    {
+                        Logger.Error("Empty send queue when semaphore reset");
+                        continue;
+                    }
+                    Client.Client.Send(serializedMessage);
                 }
                 catch (Exception e) when (e is IOException || e is ArgumentNullException ||
                                           e is ObjectDisposedException || e is SocketException)

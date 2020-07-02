@@ -12,7 +12,6 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Security.Principal;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace jNet.RPC.Server
 {
@@ -25,6 +24,7 @@ namespace jNet.RPC.Server
 
         protected readonly ConcurrentQueue<SocketMessage> _receiveQueue = new ConcurrentQueue<SocketMessage>();
         private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();               
+                protected readonly SemaphoreSlim _messageReceivedSempahore = new SemaphoreSlim(0);
 
         public ServerSession(TcpClient client, IDto initialObject, IPrincipalProvider principalProvider): base(client, new ServerReferenceResolver())
         {
@@ -58,40 +58,34 @@ namespace jNet.RPC.Server
             base.WriteThreadProc();
         }
 
-        protected override void EnqueueMessage(SocketMessage message)
+        internal override void EnqueueMessage(SocketMessage message)
         {
             _receiveQueue.Enqueue(message);
-            if (_messageReceivedSempahore.CurrentCount == 0)
-                _messageReceivedSempahore.Release();
+            _messageReceivedSempahore.Release();
         }        
 
-        protected override async Task MessageHandlerProc()
+        protected override void MessageHandlerProc()
         {
             Thread.CurrentPrincipal = _sessionUser;
 
             while (!_cancellationTokenSource.IsCancellationRequested)
             {
+                try
+                {
+                    _messageReceivedSempahore.Wait(_cancellationTokenSource.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
                 if (!_receiveQueue.TryDequeue(out var message))
                 {
-                    try
-                    {
-                        await _messageReceivedSempahore.WaitAsync(_cancellationTokenSource.Token);
-                    }
-                    catch (Exception ex)
-                    {
-                        if (ex.GetType() == typeof(OperationCanceledException))
-                            break;
-
-                        Logger.Error(ex, "Unexpected error in MessageHandler.");
-                    }
+                    Logger.Error("Empty message queue when semaphore reset");
                     continue;
                 }
 
-                if (_cancellationTokenSource.IsCancellationRequested)
-                    break;
-
                 if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
-                    Logger.Debug("Processing message: {0}:{1}", message.MessageGuid, message.DtoGuid);
+                    Logger.Trace("Processing message: {0}:{1}", message.MessageGuid, message.DtoGuid);
                 
                 try
                 {

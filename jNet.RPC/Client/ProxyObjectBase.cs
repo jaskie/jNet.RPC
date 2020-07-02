@@ -34,9 +34,9 @@ namespace jNet.RPC.Client
                 lock(Sync)
                 {
                     if (!FinalizeRequested.TryAdd(DtoGuid, this))
-                        Debug.WriteLine($"Could not save object! {DtoGuid}");
+                        Debug.WriteLine($"Could not save object {DtoGuid}");
                     else
-                        Debug.WriteLine($"Saving object! {DtoGuid}");
+                        Debug.WriteLine($"Saving object {DtoGuid}");
                     Finalized?.Invoke(this, EventArgs.Empty);
                     _finalizeRequested = true;
                     GC.ReRegisterForFinalize(this);
@@ -45,7 +45,7 @@ namespace jNet.RPC.Client
             }
             else
             {                
-                Debug.WriteLine($"Proxy {DtoGuid} finalized!");                 
+                Debug.WriteLine($"Proxy {DtoGuid} finalized");                 
             }                
         }
 
@@ -72,8 +72,8 @@ namespace jNet.RPC.Client
         public event PropertyChangedEventHandler PropertyChanged;
 
         public event EventHandler Disposed;
-        public event EventHandler Resurrected;
-
+        
+        internal event EventHandler Resurrected;
         internal event EventHandler Finalized;        
 
         protected T Get<T>([CallerMemberName] string propertyName = null)

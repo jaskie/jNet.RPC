@@ -1,10 +1,29 @@
-﻿using System.Threading;
+﻿using System;
+using System.Threading;
 
 namespace jNet.RPC.Client
 {
-    public class MessageRequest
+    internal class MessageRequest: IDisposable
     {
-        public readonly SemaphoreSlim Semaphore = new SemaphoreSlim(0);
-        public SocketMessage Message;
+        private readonly ManualResetEventSlim _mutex = new ManualResetEventSlim();
+        private SocketMessage _result;
+
+        public void Dispose()
+        {
+            _mutex.Dispose();
+        }
+
+        public void SetResult(SocketMessage message)
+        {
+            _result = message;
+            _mutex.Set();
+        }
+
+        public SocketMessage WaitForResult()
+        {
+            _mutex.Wait();
+            return _result;
+        }
+
     }
 }
