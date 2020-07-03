@@ -10,11 +10,7 @@ namespace jNet.RPC.Client
     public abstract class ClientSession : SocketConnection
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();       
-        private readonly BlockingCollection<SocketMessage> _receiveQueue = new BlockingCollection<SocketMessage>(new ConcurrentQueue<SocketMessage>());
         private readonly ConcurrentDictionary<Guid, MessageRequest> _requests = new ConcurrentDictionary<Guid, MessageRequest>();        
-        private readonly ConcurrentQueue<SocketMessage> _unresolvedQueue = new ConcurrentQueue<SocketMessage>();
-
-
 
         public ClientSession() : base(new ClientReferenceResolver())
         {
@@ -25,7 +21,6 @@ namespace jNet.RPC.Client
         {
             ((ClientReferenceResolver)ReferenceResolver).Dispose();
             base.OnDispose();
-            _receiveQueue.Dispose();
         }
 
         private void Resolver_ReferenceFinalized(object sender, ProxyObjectBaseEventArgs e)
@@ -45,11 +40,6 @@ namespace jNet.RPC.Client
                 string.Empty,
                 0,
                 null));
-        }
-
-        internal override void EnqueueMessage(SocketMessage message)
-        {
-            _receiveQueue.Add(message);
         }
 
         internal T SendAndGetResponse<T>(SocketMessage query)
@@ -92,9 +82,9 @@ namespace jNet.RPC.Client
             {
                 try
                 {
-                    var message = _receiveQueue.Take(CancellationTokenSource.Token);
+                    var message = TakeNextMessage();
                     if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
-                        Logger.Debug("Processing message: {0}:{1}:{2}:{3}", message.MessageGuid, message.DtoGuid, message.MemberName, message.ValueString);
+                        Logger.Trace("Processing message: {0}:{1}:{2}:{3}", message.MessageGuid, message.DtoGuid, message.MemberName, message.ValueString);
 
                     switch (message.MessageType)
                     {

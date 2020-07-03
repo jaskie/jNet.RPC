@@ -22,8 +22,6 @@ namespace jNet.RPC.Server
         private readonly IDto _initialObject;
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
-        private readonly BlockingCollection<SocketMessage> _receiveQueue = new BlockingCollection<SocketMessage>(new ConcurrentQueue<SocketMessage>());
-
         public ServerSession(TcpClient client, IDto initialObject, IPrincipalProvider principalProvider): base(client, new ServerReferenceResolver())
         {
             _initialObject = initialObject;           
@@ -56,11 +54,6 @@ namespace jNet.RPC.Server
             base.WriteThreadProc();
         }
 
-        internal override void EnqueueMessage(SocketMessage message)
-        {
-            _receiveQueue.Add(message);
-        }
-
         protected override void MessageHandlerProc()
         {
             Thread.CurrentPrincipal = _sessionUser;
@@ -69,7 +62,7 @@ namespace jNet.RPC.Server
             {
                 try
                 {
-                    var message = _receiveQueue.Take(CancellationTokenSource.Token);
+                    var message = TakeNextMessage();
                     if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
                         Logger.Trace("Processing message: {0}:{1}", message.MessageGuid, message.DtoGuid);
                     if (message.MessageType == SocketMessage.SocketMessageType.RootQuery)
@@ -204,7 +197,6 @@ namespace jNet.RPC.Server
         protected override void OnDispose()
         {
             base.OnDispose();
-            _receiveQueue.Dispose();
             ((ServerReferenceResolver)ReferenceResolver).ReferencePropertyChanged -= ReferenceResolver_ReferencePropertyChanged;
             lock (((IDictionary) _delegates).SyncRoot)
             {

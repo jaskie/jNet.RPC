@@ -20,7 +20,8 @@ namespace jNet.RPC
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private int _disposed;
-        private readonly BlockingCollection<byte[]> _sendQueue; 
+        private readonly BlockingCollection<byte[]> _sendQueue;
+        private readonly BlockingCollection<SocketMessage> _receiveQueue = new BlockingCollection<SocketMessage>(new ConcurrentQueue<SocketMessage>());
 
         private Thread _readThread;
         private Thread _writeThread;
@@ -133,6 +134,7 @@ namespace jNet.RPC
             _readThread?.Join();
             _writeThread?.Join();
             _sendQueue.Dispose();
+            _receiveQueue.Dispose();
             CancellationTokenSource.Dispose();
             IsConnected = false;
             Logger.Info("Connection closed.");
@@ -163,9 +165,8 @@ namespace jNet.RPC
             };
             _writeThread.Start();            
         }
-       
+
         public event EventHandler Disconnected;
-        internal abstract void EnqueueMessage(SocketMessage message);
         protected abstract void MessageHandlerProc();
         protected virtual void WriteThreadProc()
         {
@@ -219,7 +220,7 @@ namespace jNet.RPC
                         var message = new SocketMessage(dataBuffer);
                         if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
                             Logger.Debug("Message received {0}:{1}", message.MessageGuid, message.MessageType);
-                        EnqueueMessage(message);
+                        _receiveQueue.Add(message);
                         dataBuffer = null;                                               
                     }
                 }
@@ -234,6 +235,11 @@ namespace jNet.RPC
                     Logger.Error(e, "Read thread unexpected exception");
                 }
             }
+        }
+
+        protected SocketMessage TakeNextMessage()
+        {
+            return _receiveQueue.Take(CancellationTokenSource.Token);
         }
 
         protected void NotifyDisconnection()
