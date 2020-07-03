@@ -69,7 +69,7 @@ namespace jNet.RPC.Client
                     return result;
                 }
             }
-            catch (ObjectDisposedException)
+            catch (Exception e) when (e is OperationCanceledException || e is ObjectDisposedException)
             {
                 NotifyDisconnection();
                 return default;
