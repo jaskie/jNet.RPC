@@ -1,4 +1,4 @@
-﻿//#undef DEBUG
+﻿#undef DEBUG
 
 using System;
 using System.Collections.Concurrent;
@@ -17,42 +17,55 @@ namespace jNet.RPC.Client
     public abstract class ProxyObjectBase : IDto
     {
         private int _isDisposed;
-        private bool _finalizeRequested;
+        private int _isFinalizeRequested;
         private RemoteClient _client;
-        private const int DisposedValue = 1;
-        public static readonly object Sync = new object();
+        
+        private static readonly ConcurrentDictionary<Guid, ProxyObjectBase> FinalizeRequested = new ConcurrentDictionary<Guid, ProxyObjectBase>();
+
+
+        internal static bool TryResurect(Guid dtoGuid, out ProxyObjectBase finalizeRequested)
+        {
+            if (FinalizeRequested.TryGetValue(dtoGuid, out finalizeRequested))
+            {
+                finalizeRequested.Resurrect();
+                return true;
+            }
+            return false;
+        }
+
+        internal static bool TryGetFinalizeRequested(Guid dtoGuid, out ProxyObjectBase finalizeRequested)
+        {
+            return FinalizeRequested.TryGetValue(dtoGuid, out finalizeRequested);
+        }
+
         public void Dispose()
         {
-            if (Interlocked.Exchange(ref _isDisposed, DisposedValue) == default)
+            if (Interlocked.Exchange(ref _isDisposed, 1) == default)
                 DoDispose();
         }
         
         ~ProxyObjectBase()
         {
-            if (!_finalizeRequested) //first finalization will send request to server; on response hard reference would be deleted and object collected in next GC run
+            if (Interlocked.Exchange(ref _isFinalizeRequested, 1) == default) //first finalization will send request to server; on response hard reference will be deleted and object collected in next GC run
             {
-                lock(Sync)
-                {
-                    if (!FinalizeRequested.TryAdd(DtoGuid, this))
-                        Debug.WriteLine($"Could not save object {DtoGuid}");
-                    else
-                        Debug.WriteLine($"Saving object {DtoGuid}");
-                    Finalized?.Invoke(this, EventArgs.Empty);
-                    _finalizeRequested = true;
-                    GC.ReRegisterForFinalize(this);
-                }
-                
+                if (!FinalizeRequested.TryAdd(DtoGuid, this))
+                    Debug.WriteLine($"Could not save object {DtoGuid}");
+                else
+                    Debug.WriteLine($"Saving object {DtoGuid}");
+                Finalized?.Invoke(this, EventArgs.Empty);
+                GC.ReRegisterForFinalize(this);
             }
             else
-            {                
-                Debug.WriteLine($"Proxy {DtoGuid} finalized");                 
+            {
+                Debug.WriteLine($"Proxy {DtoGuid} finalized");
             }                
         }
+
 
         public void Resurrect()
         {                        
             FinalizeRequested.TryRemove(DtoGuid, out _);
-            _finalizeRequested = false;
+            _isFinalizeRequested = default;
             Debug.WriteLine($"Trying to resurrect {DtoGuid}");
             Resurrected?.Invoke(this, EventArgs.Empty);            
         }
@@ -60,12 +73,9 @@ namespace jNet.RPC.Client
         public void FinalizeProxy()
         {
             FinalizeRequested.TryRemove(DtoGuid, out _);
-            _finalizeRequested = true;            
             Debug.WriteLine("Proxy strong reference delete {0}", DtoGuid);
             Debug.WriteLine(FinalizeRequested.Count);
         }                
-
-        public static readonly ConcurrentDictionary<Guid, ProxyObjectBase> FinalizeRequested = new ConcurrentDictionary<Guid, ProxyObjectBase>();
 
         public Guid DtoGuid { get; internal set; }        
 
@@ -78,7 +88,7 @@ namespace jNet.RPC.Client
 
         protected T Get<T>([CallerMemberName] string propertyName = null)
         {
-            if (_isDisposed == DisposedValue)
+            if (_isDisposed != default)
                 return default;
             if (string.IsNullOrEmpty(propertyName))
                 return default;
@@ -89,7 +99,7 @@ namespace jNet.RPC.Client
 
         protected void Set<T>(T value, [CallerMemberName] string propertyName = null)
         {
-            if (_isDisposed == DisposedValue)
+            if (_isDisposed != default)
                 return;
             Type type = typeof(T);
             FieldInfo field =  GetField(type, propertyName);
@@ -104,21 +114,21 @@ namespace jNet.RPC.Client
 
         protected void Invoke([CallerMemberName] string methodName = null, params object[] parameters)
         {
-            if (_isDisposed == DisposedValue)
+            if (_isDisposed != default)
                 return;
             _client.Invoke(this, methodName, parameters);
         }
 
         protected T Query<T>([CallerMemberName] string methodName = null, params object[] parameters)
         {
-            if (_isDisposed == DisposedValue)
+            if (_isDisposed != default)
                 return default;
             return _client.Query<T>(this, methodName, parameters);
         }
 
         protected void EventAdd<T>(T handler, [CallerMemberName] string eventName = null)
         {
-            if (_isDisposed == DisposedValue)
+            if (_isDisposed != default)
                 return;
             if (handler == null && !DtoGuid.Equals(Guid.Empty))
                 _client?.EventAdd(this, eventName);
@@ -126,7 +136,7 @@ namespace jNet.RPC.Client
 
         protected void EventRemove<T>(T handler, [CallerMemberName] string eventName = null)
         {
-            if (_isDisposed == DisposedValue)
+            if (_isDisposed != default)
                 return;
             if (handler == null && !DtoGuid.Equals(Guid.Empty))
             {

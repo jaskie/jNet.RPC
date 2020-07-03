@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -54,19 +53,13 @@ namespace jNet.RPC.Client
 
                     if (!_requests.TryRemove(query.MessageGuid, out var _))
                     {
-                        Logger.Warn("SendAndGetResponse client trapped! {0}:{1}", response.MessageGuid, response.MessageType);
+                        Logger.Warn("SendAndGetResponse client trapped {0}:{1}", response.MessageGuid, response.MessageType);
                         return default;
                     }
 
                     if (response.MessageType == SocketMessage.SocketMessageType.Exception)
                         throw Deserialize<Exception>(response);
-
-                    var result = Deserialize<T>(response);
-
-                    if (result == null)
-                        Logger.Debug("Returned null. MessageGuid {0}:", query.MessageGuid);
-
-                    return result;
+                    return Deserialize<T>(response);
                 }
             }
             catch (Exception e) when (e is OperationCanceledException || e is ObjectDisposedException)
@@ -133,7 +126,7 @@ namespace jNet.RPC.Client
                     var obj = (T)Serializer.Deserialize(reader, typeof(T));
                     if (obj is ProxyObjectBase target)
                     {
-                        var source = ((ClientReferenceResolver)ReferenceResolver).ProxiesToPopulate.FirstOrDefault(p => p.DtoGuid == target.DtoGuid);
+                        var source = ((ClientReferenceResolver)ReferenceResolver).TakeProxyToPopulate(target.DtoGuid);
                         if (source == null)
                             return obj;
                         try
@@ -145,10 +138,6 @@ namespace jNet.RPC.Client
                         {
                             Logger.Error(ex, "Error when populating {0}:{1}", source.DtoGuid, target.DtoGuid);
                         }
-                        finally
-                        {
-                            ((ClientReferenceResolver)ReferenceResolver).ProxiesToPopulate.Remove(source);
-                        }                        
                     }
 
 #if DEBUG
