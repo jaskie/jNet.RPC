@@ -87,7 +87,7 @@ namespace jNet.RPC
         {
             var contract = base.CreateStringContract(objectType);
             if (typeof(System.Drawing.Bitmap).IsAssignableFrom(objectType))
-                contract.Converter = new BitmapJsonConverter();
+                contract.Converter = BitmapJsonConverter.Current;
             return contract;
         }
 

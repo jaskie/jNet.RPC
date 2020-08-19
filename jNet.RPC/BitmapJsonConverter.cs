@@ -7,6 +7,11 @@ namespace jNet.RPC
 {
     public class BitmapJsonConverter : JsonConverter
     {
+        private BitmapJsonConverter()
+        { }
+
+        public static BitmapJsonConverter Current { get; } = new BitmapJsonConverter();
+
         public override bool CanConvert(Type objectType)
         {
             return objectType == typeof(Bitmap);
