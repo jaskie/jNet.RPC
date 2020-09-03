@@ -159,7 +159,7 @@ namespace jNet.RPC.Server
                                     SendResponse(message, null);
                                     break;
                                 case SocketMessage.SocketMessageType.ProxyFinalized:
-                                    RemoveReference(objectToInvoke);
+                                    ((ServerReferenceResolver)ReferenceResolver).RemoveReference(objectToInvoke);
                                     SendResponse(message, null);
                                     break;
                                 case SocketMessage.SocketMessageType.ProxyResurrected:
@@ -180,7 +180,6 @@ namespace jNet.RPC.Server
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"Exception while handling message. {ex.Message}");
                     Logger.Error(ex);
                 }
             }
@@ -225,7 +224,7 @@ namespace jNet.RPC.Server
                 if (_delegates.ContainsKey(signature))
                     return;
                 var delegateToInvoke = ConvertDelegate((Action<object, EventArgs>) delegate(object o, EventArgs ea) { NotifyClient(objectToInvoke, ea, ei.Name); }, ei.EventHandlerType);
-                Debug.WriteLine($"Server: added delegate {ei.Name} on {objectToInvoke}");
+                Debug.WriteLine($"Server: added delegate {signature} on {objectToInvoke}");
                 _delegates[signature] = delegateToInvoke;
                 ei.AddEventHandler(objectToInvoke, delegateToInvoke);
             }
@@ -240,7 +239,7 @@ namespace jNet.RPC.Server
                 if (!_delegates.Remove(signature))
                     return;
                 ei.RemoveEventHandler(objectToInvoke, delegateToRemove);
-                Debug.WriteLine($"Server: removed delegate {ei.Name} on {objectToInvoke}");
+                Debug.WriteLine($"Server: removed delegate {signature} on {objectToInvoke}");
             }
         }
 
@@ -292,22 +291,6 @@ namespace jNet.RPC.Server
             }
         }
 
-        private void RemoveReference(IDto dto)
-        {
-            lock(((IDictionary)_delegates).SyncRoot)
-            {
-                var delegatesToRemove = _delegates.Keys.Where(k => k.DtoGuid == dto.DtoGuid).ToArray();
-                foreach (var dk in delegatesToRemove)
-                {
-                    var ei = dto.GetType().GetEvent(dk.EventName);
-                    RemoveDelegate(dto, ei);
-                }
-            }
-            ((ServerReferenceResolver)ReferenceResolver).RemoveReference(dto);
-            Debug.WriteLine($"Server: Reference removed: {dto}");
-        }
-
-
         private void ReferenceResolver_ReferencePropertyChanged(object sender, WrappedEventArgs e)
         {
             NotifyClient(e.Dto, e, nameof(INotifyPropertyChanged.PropertyChanged));
@@ -341,6 +324,11 @@ namespace jNet.RPC.Server
                 {
                     return (DtoGuid.GetHashCode() * 397) ^ (EventName != null ? EventName.GetHashCode() : 0);
                 }
+            }
+
+            public override string ToString()
+            {
+                return $"{DtoGuid}:{EventName}";
             }
         }
 

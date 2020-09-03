@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 
 namespace jNet.RPC.Client
@@ -28,7 +29,6 @@ namespace jNet.RPC.Client
                 return;
             var id = new Guid(reference);
             proxy.DtoGuid = id;
-
             lock(((IDictionary)_knownDtos).SyncRoot)
             {                
                 if (!_knownDtos.ContainsKey(id))
@@ -36,12 +36,12 @@ namespace jNet.RPC.Client
                     _knownDtos.Add(id, new WeakReference<ProxyObjectBase>(proxy, true));
                     proxy.Finalized += Proxy_Finalized;
                     proxy.Resurrected += Proxy_Resurrected;
-                    Logger.Debug("AddReference {0} for {1}", reference, value);                    
+                    Logger.Trace("AddReference {0} for {1}", reference, value);                    
                 }
                 else
                 {
                     _proxiesToPopulate[proxy.DtoGuid] = proxy;
-                    Logger.Warn("AddReference already in knownDtos, will populate {0}:{1}:{2}", id, reference, proxy.DtoGuid);
+                    Logger.Debug("AddReference already in knownDtos, will populate {0}", proxy);
                 }                    
             }            
         }        
@@ -127,7 +127,7 @@ namespace jNet.RPC.Client
                 proxy.FinalizeProxy();
                 return;
             }
-            Logger.Warn("Could not finalize resurrected proxy {0}", reference.ToString());
+            Logger.Debug("Could not finalize resurrected proxy {0}", reference);
         }
 
         private void Proxy_Resurrected(object sender, EventArgs e)
@@ -144,7 +144,7 @@ namespace jNet.RPC.Client
             }
             catch
             {
-                Logger.Debug("Could not restore to knownDto list {0}", proxy.DtoGuid);
+                Logger.Warn("Could not restore to knownDto list {0}", proxy.DtoGuid);
             }
                 
 
@@ -158,7 +158,7 @@ namespace jNet.RPC.Client
 
             lock (((IDictionary)_knownDtos).SyncRoot)
             {
-                Logger.Debug("Deleting from knowndtos {0}", proxy.DtoGuid);
+                Logger.Trace("Deleting from knowndtos {0}", proxy.DtoGuid);
                 _knownDtos.Remove(proxy.DtoGuid);
                 ReferenceFinalized?.Invoke(this, new ProxyObjectBaseEventArgs(proxy));
             }            
