@@ -86,10 +86,9 @@ namespace jNet.RPC.Client
                     return target;
                 else
                 {
-                    Logger.Debug("Unknown reference: {0}", reference);
+                    Logger.Warn("Unknown reference: {0}", reference);
+                    return null;
                 }
-
-                return null;
             }
         }
 
