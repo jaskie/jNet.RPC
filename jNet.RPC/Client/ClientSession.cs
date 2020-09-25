@@ -11,14 +11,14 @@ namespace jNet.RPC.Client
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();       
         private readonly ConcurrentDictionary<Guid, MessageRequest> _requests = new ConcurrentDictionary<Guid, MessageRequest>();        
 
-        public ClientSession() : base(new ClientReferenceResolver())
+        public ClientSession() : base(new ReferenceResolver())
         {
-            ((ClientReferenceResolver)ReferenceResolver).ReferenceFinalized += Resolver_ReferenceFinalized;                     
+            ((ReferenceResolver)ReferenceResolver).ReferenceFinalized += Resolver_ReferenceFinalized;                     
         }        
 
         protected override void OnDispose()
         {
-            ((ClientReferenceResolver)ReferenceResolver).Dispose();
+            ((ReferenceResolver)ReferenceResolver).Dispose();
             base.OnDispose();
         }
 
@@ -82,11 +82,11 @@ namespace jNet.RPC.Client
                     switch (message.MessageType)
                     {
                         case SocketMessage.SocketMessageType.ProxyFinalized:
-                            ((ClientReferenceResolver)ReferenceResolver).DeleteReference(message.DtoGuid);
+                            ((ReferenceResolver)ReferenceResolver).DeleteReference(message.DtoGuid);
                             break;
 
                         case SocketMessage.SocketMessageType.EventNotification:
-                            var notifyObject = ((ClientReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
+                            var notifyObject = ((ReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
                             if (notifyObject == null)
                                 Logger.Warn("NotifyObject null: {0}:{1}", message.MessageGuid, message.DtoGuid);
                             else
@@ -126,7 +126,7 @@ namespace jNet.RPC.Client
                     var obj = (T)Serializer.Deserialize(reader, typeof(T));
                     if (obj is ProxyObjectBase target)
                     {
-                        var source = ((ClientReferenceResolver)ReferenceResolver).TakeProxyToPopulate(target.DtoGuid);
+                        var source = ((ReferenceResolver)ReferenceResolver).TakeProxyToPopulate(target.DtoGuid);
                         if (source == null)
                             return obj;
                         try

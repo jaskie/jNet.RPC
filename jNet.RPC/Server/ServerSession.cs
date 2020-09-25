@@ -21,8 +21,9 @@ namespace jNet.RPC.Server
         private readonly IDto _initialObject;
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
-        public ServerSession(TcpClient client, IDto initialObject, IPrincipalProvider principalProvider): base(client, new ServerReferenceResolver())
+        public ServerSession(TcpClient client, IDto initialObject, IPrincipalProvider principalProvider): base(client, new ReferenceResolver())
         {
+            Serializer.SerializationBinder = new SerializationBinder();
             _initialObject = initialObject;           
             if (!(client.Client.RemoteEndPoint is IPEndPoint))
                 throw new UnauthorizedAccessException("Client RemoteEndpoint is invalid");
@@ -30,8 +31,8 @@ namespace jNet.RPC.Server
             if (_sessionUser == null)
                 throw new UnauthorizedAccessException($"Client {Client.Client.RemoteEndPoint} not allowed");
             Logger.Info("Client {0} from {1} successfully connected", _sessionUser.Identity, Client.Client.RemoteEndPoint);
-            ((ServerReferenceResolver)ReferenceResolver).ReferencePropertyChanged += ReferenceResolver_ReferencePropertyChanged;
-            StartThreads();           
+            ((ReferenceResolver)ReferenceResolver).ReferencePropertyChanged += ReferenceResolver_ReferencePropertyChanged;
+            StartThreads();    
         }
 
 #if DEBUG
@@ -68,7 +69,7 @@ namespace jNet.RPC.Server
                         SendResponse(message, _initialObject);
                     else // method of particular object
                     {
-                        var objectToInvoke = ((ServerReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
+                        var objectToInvoke = ((ReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
                         if (objectToInvoke != null)
                         {
                             Debug.WriteLine($"{objectToInvoke}:{message.MemberName}");
@@ -159,11 +160,11 @@ namespace jNet.RPC.Server
                                     SendResponse(message, null);
                                     break;
                                 case SocketMessage.SocketMessageType.ProxyFinalized:
-                                    ((ServerReferenceResolver)ReferenceResolver).RemoveReference(objectToInvoke);
+                                    ((ReferenceResolver)ReferenceResolver).RemoveReference(objectToInvoke);
                                     SendResponse(message, null);
                                     break;
                                 case SocketMessage.SocketMessageType.ProxyResurrected:
-                                    ((ServerReferenceResolver)ReferenceResolver).RestoreReference(objectToInvoke);
+                                    ((ReferenceResolver)ReferenceResolver).RestoreReference(objectToInvoke);
                                     break;
                             }
                         }
@@ -195,19 +196,19 @@ namespace jNet.RPC.Server
         protected override void OnDispose()
         {
             base.OnDispose();
-            ((ServerReferenceResolver)ReferenceResolver).ReferencePropertyChanged -= ReferenceResolver_ReferencePropertyChanged;
+            ((ReferenceResolver)ReferenceResolver).ReferencePropertyChanged -= ReferenceResolver_ReferencePropertyChanged;
             lock (((IDictionary) _delegates).SyncRoot)
             {
                 foreach (var d in _delegates.Keys.ToArray())
                 {
-                    var havingDelegate = ((ServerReferenceResolver)ReferenceResolver).ResolveReference(d.DtoGuid);
+                    var havingDelegate = ((ReferenceResolver)ReferenceResolver).ResolveReference(d.DtoGuid);
                     if (havingDelegate == null)
                         throw new ApplicationException("Referenced object not found");
                     var ei = havingDelegate.GetType().GetEvent(d.EventName);
                     RemoveDelegate(havingDelegate, ei);
                 }
             }
-            ((ServerReferenceResolver)ReferenceResolver).Dispose();
+            ((ReferenceResolver)ReferenceResolver).Dispose();
         }
 
         private void SendResponse(SocketMessage message, object response)

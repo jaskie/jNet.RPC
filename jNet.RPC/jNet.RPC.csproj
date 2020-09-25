@@ -61,18 +61,22 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ProxyNamespaceAttribute.cs" />
     <Compile Include="BitmapJsonConverter.cs" />
-    <Compile Include="Client\ClientReferenceResolver.cs" />
+    <Compile Include="Client\ReferenceResolver.cs" />
+    <Compile Include="Client\ClientSession.cs" />
     <Compile Include="Client\MessageRequest.cs" />
     <Compile Include="Client\ProxyObjectBaseEventArgs.cs" />
-    <Compile Include="Client\ClientSession.cs" />
+    <Compile Include="Client\SerializationBinder.cs" />
+    <Compile Include="DtoTypeAttribute.cs" />
     <Compile Include="DtoMemberAttribute.cs" />
     <Compile Include="IRemoteHostConfig.cs" />
     <Compile Include="PropertyChangedWithValueEventArgs.cs" />
     <Compile Include="SerializationContractResolver.cs" />
+    <Compile Include="Server\SerializationBinder.cs" />
     <Compile Include="Server\IPrincipalProvider.cs" />
     <Compile Include="Server\PrincipalProvider.cs" />
-    <Compile Include="Server\ServerReferenceResolver.cs" />
+    <Compile Include="Server\ReferenceResolver.cs" />
     <Compile Include="Client\ProxyObjectBase.cs" />
     <Compile Include="Client\RemoteClient.cs" />
     <Compile Include="IDto.cs" />

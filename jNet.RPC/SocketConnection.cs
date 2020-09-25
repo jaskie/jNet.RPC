@@ -27,7 +27,7 @@ namespace jNet.RPC
         private Thread _writeThread;
 
         public TcpClient Client { get; private set; }
-        public JsonSerializer Serializer { get; } 
+        internal JsonSerializer Serializer { get; } 
        
         protected IReferenceResolver ReferenceResolver { get; }
 
@@ -67,7 +67,7 @@ namespace jNet.RPC
             });
         }
 
-        public async Task<bool> Connect(string address)
+        public async Task<bool> ConnectAsync(string address)
         {
             var port = 1060;
             var addressParts = address.Split(':');
@@ -92,11 +92,6 @@ namespace jNet.RPC
                 Disconnected?.Invoke(this, EventArgs.Empty);
             }
             return false;
-        }
-
-        protected void SetBinder(ISerializationBinder binder)
-        {
-            Serializer.SerializationBinder = binder;
         }
 
         internal void Send(SocketMessage message)
