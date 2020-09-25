@@ -45,11 +45,25 @@ namespace jNet.RPC.Client
             return type;
         }
 
-        public Type FindType(string assemblyName, string typeName)
+        private Type FindType(string assemblyName, string typeName)
         {
-            var mapping = _assemblyNamespaceMappings.FirstOrDefault(m => typeName.StartsWith(m.OriginalNamespace));
-            if (mapping == null)
+            var mappings = _assemblyNamespaceMappings.Where(m => typeName.StartsWith(m.OriginalNamespace));
+            if (!mappings.Any())
                 return Type.GetType($"{typeName}, {assemblyName}", true);
+            Type type = null;
+            foreach (var mapping in mappings)
+            {
+                type = FindTypeInMappedAssembly(mapping, assemblyName, typeName);
+                if (type != null)
+                    break;
+            }
+            if (type == null)
+                return Type.GetType($"{typeName}, {assemblyName}", true);
+            return type;
+        }
+
+        private Type FindTypeInMappedAssembly(AssemblyNamespaceMapping mapping, string assemblyName, string typeName)
+        {
             var type = mapping.Assembly.GetTypes().FirstOrDefault(t =>
             {
                 var a = t.GetCustomAttribute<DtoTypeAttribute>();
@@ -61,11 +75,10 @@ namespace jNet.RPC.Client
             });
             if (type != null)
                 return type;
+            if (mapping.OriginalNamespace.Length >= typeName.Length)
+                return null;
             var newTypeName = mapping.ProxyNamespace + typeName.Substring(mapping.OriginalNamespace.Length);
-            type = mapping.Assembly.GetType(newTypeName);
-            if (type == null)
-                return Type.GetType($"{typeName}, {assemblyName}", true);
-            return type;
+            return mapping.Assembly.GetType(newTypeName);
         }
 
         public void BindToName(Type serializedType, out string assemblyName, out string typeName)
