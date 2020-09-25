@@ -9,7 +9,7 @@ namespace jNet.RPC.UnitTests.Client
     [TestClass]
     public class ClientReferenceResolverTests
     {
-        ClientReferenceResolver _clientReferenceResolver;
+        ReferenceResolver _clientReferenceResolver;
         Dictionary<Guid, WeakReference<ProxyObjectBase>> _knownDtos;        
         MockProxyObject _mockObject;
 
@@ -17,7 +17,7 @@ namespace jNet.RPC.UnitTests.Client
         public void Initialize()
         {
             _mockObject = new MockProxyObject { DtoGuid = Guid.NewGuid() };
-            _clientReferenceResolver = new ClientReferenceResolver();
+            _clientReferenceResolver = new ReferenceResolver();
 
             var po = new PrivateObject(_clientReferenceResolver);            
             _knownDtos = ((Dictionary<Guid, WeakReference<ProxyObjectBase>>)po.GetField("_knownDtos"));
@@ -59,8 +59,8 @@ namespace jNet.RPC.UnitTests.Client
 
             var knownDtosInitialCount = _knownDtos.Count;
             _clientReferenceResolver.AddReference(this, _mockObject.DtoGuid.ToString(), _mockObject);
-
-            Assert.AreEqual(_clientReferenceResolver.ProxiesToPopulate[0], _mockObject, "Wrong object added to population.");
+            PrivateObject po = new PrivateObject(_clientReferenceResolver);
+            Assert.AreEqual(po.GetArrayElement("_proxiesToPopulate", 0), _mockObject, "Wrong object added to population.");
             Assert.AreEqual(knownDtosInitialCount, _knownDtos.Count, "KnownDtos shouldn't increased!");
         }
         #endregion

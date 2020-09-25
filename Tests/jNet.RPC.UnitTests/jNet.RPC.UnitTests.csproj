@@ -50,7 +50,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Client\ClientReferenceResolverTests.cs" />
-    <Compile Include="Client\DefaultSerializationBinderTests.cs" />
     <Compile Include="Client\ProxyObjectBaseTests.cs" />
     <Compile Include="MockModel\MockProxyObject.cs" />
     <Compile Include="MockModel\MockServerObject.cs" />

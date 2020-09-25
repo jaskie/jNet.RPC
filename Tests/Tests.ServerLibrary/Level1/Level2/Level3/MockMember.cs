@@ -5,7 +5,7 @@ using Tests.CommonLibrary;
 
 namespace Tests.ServerLibrary.Level1.Level2.Level3
 {
-    [DtoClass(nameof(IMockMember))]
+    [DtoType(typeof(IMockMember))]
     public class MockMember : ServerObjectBase, IMockMember
     {
         private string _valueString;

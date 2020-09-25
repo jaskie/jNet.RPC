@@ -22,7 +22,7 @@ namespace jNet.RPC.IntegrationTests.Communication
         public void ResolveProxyTypesLocal_ProxyObjectBase(ServerHost server, RemoteClient client, Type expectedType)
         {
             server.Start();           
-            client.Connect($"127.0.0.1:{server.ListenPort}").Wait();
+            client.ConnectAsync($"127.0.0.1:{server.ListenPort}").Wait();
 
             var proxy = client.GetRootObject<IMockRoot>();
 
@@ -47,8 +47,7 @@ namespace jNet.RPC.IntegrationTests.Communication
         {
             server.Start();
             
-            client.DefaultBinder.AddProxyAssembly("Tests.ClientLibrary");
-            client.Connect($"127.0.0.1:{server.ListenPort}").Wait();
+            client.ConnectAsync($"127.0.0.1:{server.ListenPort}").Wait();
 
             var proxy = client.GetRootObject<IMockRoot>();
             
@@ -72,8 +71,7 @@ namespace jNet.RPC.IntegrationTests.Communication
         {
             server.Start();
             
-            client.DefaultBinder.AddProxyTypeAssignment(rootObjectType.FullName, expectedType);                                    
-            client.Connect($"127.0.0.1:{server.ListenPort}").Wait();
+            client.ConnectAsync($"127.0.0.1:{server.ListenPort}").Wait();
 
             var proxy = client.GetRootObject<IMockRoot>();
 

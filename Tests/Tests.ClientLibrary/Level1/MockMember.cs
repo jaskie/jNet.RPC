@@ -5,7 +5,7 @@ using Tests.CommonLibrary;
 
 namespace Tests.ClientLibrary.Level1
 {
-    [DtoClass(nameof(IMockMember))]
+    [DtoType(typeof(IMockMember))]
     public class MockMember : ProxyObjectBase, IMockMember
     {
 #pragma warning disable CS0649

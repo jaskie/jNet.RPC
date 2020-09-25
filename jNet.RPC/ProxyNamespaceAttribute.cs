@@ -5,7 +5,7 @@ namespace jNet.RPC
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
     public sealed class ProxyNamespaceAttribute: Attribute
     {
-        public ProxyNamespaceAttribute(string serverNamespace, string clientNamespace)
+        public ProxyNamespaceAttribute(string serverNamespace, string clientNamespace = null)
         {
             ServerNamespace = serverNamespace;
             ClientNamespace = clientNamespace;

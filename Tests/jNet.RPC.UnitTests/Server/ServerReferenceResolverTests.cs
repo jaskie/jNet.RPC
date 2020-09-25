@@ -13,7 +13,7 @@ namespace jNet.RPC.UnitTests.Server
         [TestMethod]
         public void GetReferenceTest_Referenced_ReturnDto()
         {
-            var serverReferenceResolver = new ServerReferenceResolver();
+            var serverReferenceResolver = new ReferenceResolver();
             PrivateObject po = new PrivateObject(serverReferenceResolver);
             var _knownDtos = ((Dictionary<Guid, ServerObjectBase>)po.GetField("_knownDtos"));
             var mockObject = new MockServerObject("TestValue");
@@ -32,7 +32,7 @@ namespace jNet.RPC.UnitTests.Server
         public void GetReferenceTest_NonDtoObject_ReturnEmpty()
         {
             var mockObject = new object();
-            var serverReferenceResolver = new ServerReferenceResolver();
+            var serverReferenceResolver = new ReferenceResolver();
             var result = serverReferenceResolver.GetReference(this, mockObject);
             Assert.AreEqual(result, String.Empty, "");
         }
@@ -40,7 +40,7 @@ namespace jNet.RPC.UnitTests.Server
         [TestMethod]
         public void GetReferenceTest_NonReferenced_ReturnDto()
         {
-            var serverReferenceResolver = new ServerReferenceResolver();
+            var serverReferenceResolver = new ReferenceResolver();
             PrivateObject po = new PrivateObject(serverReferenceResolver);
             var mockObject = new MockServerObject("TestValue");
             var _knownDtos = ((Dictionary<Guid, ServerObjectBase>)po.GetField("_knownDtos"));
@@ -61,7 +61,7 @@ namespace jNet.RPC.UnitTests.Server
         public void IsReferencedTest_Referenced_ReturnTrue()
         {
             var mockObject = new MockServerObject("TestValue");
-            var serverReferenceResolver = new ServerReferenceResolver();
+            var serverReferenceResolver = new ReferenceResolver();
             serverReferenceResolver.GetReference(this, mockObject);
             Assert.IsTrue(serverReferenceResolver.IsReferenced(this, mockObject));
         }
@@ -70,13 +70,13 @@ namespace jNet.RPC.UnitTests.Server
         public void IsReferencedTest_NonReferenced_ReturnFalse()
         {
             var mockObject = new MockServerObject("TestValue");
-            var serverReferenceResolver = new ServerReferenceResolver();
+            var serverReferenceResolver = new ReferenceResolver();
             Assert.IsFalse(serverReferenceResolver.IsReferenced(this, mockObject));
         }
         public void IsReferencedTest_NonDto_ReturnGuidEmpty()
         {
             var obj = new object();
-            var serverReferenceResolver = new ServerReferenceResolver();
+            var serverReferenceResolver = new ReferenceResolver();
             var result = serverReferenceResolver.IsReferenced(this, obj);
             Assert.AreEqual(result, Guid.Empty);
         }
@@ -86,7 +86,7 @@ namespace jNet.RPC.UnitTests.Server
         [TestMethod]
         public void ResolveReferenceTest_UnknownGuid_ReturnNull()
         {
-            var serverReferenceResolver = new ServerReferenceResolver();            
+            var serverReferenceResolver = new ReferenceResolver();            
             
             var dto = serverReferenceResolver.ResolveReference(new Guid());
 
@@ -96,7 +96,7 @@ namespace jNet.RPC.UnitTests.Server
         [TestMethod]
         public void ResolveReferenceTest_Referenced_ReturnDto()
         {
-            var serverReferenceResolver = new ServerReferenceResolver();
+            var serverReferenceResolver = new ReferenceResolver();
             PrivateObject po = new PrivateObject(serverReferenceResolver);
             var mockObject = new MockServerObject("TestValue");
             var _knownDtos = ((Dictionary<Guid, ServerObjectBase>)po.GetField("_knownDtos"));
@@ -114,7 +114,7 @@ namespace jNet.RPC.UnitTests.Server
         [TestMethod]
         public void ResolveReferenceTest_NonReferenced_ReturnDto()
         {
-            var serverReferenceResolver = new ServerReferenceResolver();
+            var serverReferenceResolver = new ReferenceResolver();
             PrivateObject po = new PrivateObject(serverReferenceResolver);
             var mockObject = new MockServerObject("TestValue");
             var _knownDtos = ((Dictionary<Guid, ServerObjectBase>)po.GetField("_knownDtos"));

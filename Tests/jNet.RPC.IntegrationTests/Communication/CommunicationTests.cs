@@ -23,7 +23,7 @@ namespace jNet.RPC.IntegrationTests.Communication
             _server.Start();
 
             _client = new RemoteClient();
-            await _client.Connect("127.0.0.1:1100");
+            await _client.ConnectAsync("127.0.0.1:1100");
         }
 
         [ClassCleanup]

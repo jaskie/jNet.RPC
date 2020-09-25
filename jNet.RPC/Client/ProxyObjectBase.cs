@@ -20,7 +20,7 @@ namespace jNet.RPC.Client
         private int _isFinalizeRequested;
         private RemoteClient _client;
         
-        private static readonly ConcurrentDictionary<Guid, ProxyObjectBase> FinalizeRequested = new ConcurrentDictionary<Guid, ProxyObjectBase>();
+        internal static readonly ConcurrentDictionary<Guid, ProxyObjectBase> FinalizeRequested = new ConcurrentDictionary<Guid, ProxyObjectBase>();
 
 
         internal static bool TryResurect(Guid dtoGuid, out ProxyObjectBase finalizeRequested)
