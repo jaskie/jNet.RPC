@@ -41,6 +41,8 @@ namespace jNet.RPC.Client
                 return type;
             type = FindType(assemblyName, typeName);
             Debug.Assert(type != null);
+            if (type.IsInterface)
+                type = ProxyBuilder.GetProxyTypeFor(type);
             _typeCache.TryAdd(key, type);
             return type;
         }
