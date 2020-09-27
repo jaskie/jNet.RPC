@@ -1,11 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace jNet.RPC.Client
 {
@@ -28,8 +24,14 @@ namespace jNet.RPC.Client
             TypeBuilder typeBuilder = ModuleBuilder.DefineType(typeName, TypeAttributes.Class | TypeAttributes.Public, typeof(ProxyObjectBase));
             typeBuilder.AddInterfaceImplementation(interfaceType);
             AddMethodOnEventNotification(typeBuilder);
-            foreach (var property in interfaceType.GetProperties())
+            var implementedInterfaces = (new Type[] { interfaceType }).Concat(interfaceType.GetInterfaces()).ToArray();
+            var interfaceProperties = implementedInterfaces.SelectMany(i => i.GetProperties()).Distinct().ToArray();
+            foreach (var property in interfaceProperties)
                 AddProperty(typeBuilder, property);
+            foreach (var method in implementedInterfaces.SelectMany(i => i.GetMethods().Where(m => !m.IsSpecialName)).Distinct())
+                AddMethod(typeBuilder, method);
+            foreach (var @event in implementedInterfaces.SelectMany(i => i.GetEvents()).Distinct())
+                AddEvent(typeBuilder, @event);
             return typeBuilder.CreateType();
         }
 
@@ -43,6 +45,8 @@ namespace jNet.RPC.Client
 
         private static void AddProperty(TypeBuilder typeBuilder, PropertyInfo property)
         {
+            if (typeof(ProxyObjectBase).GetProperty(property.Name) != null)
+                return;
             var fieldName = $"_{property.Name[0].ToString().ToLowerInvariant()}{property.Name.Substring(1)}";
             var fieldBuilder = typeBuilder.DefineField(fieldName, property.PropertyType, FieldAttributes.Private);
             ConstructorInfo fieldDtoMemberAttrInfo = typeof(DtoMemberAttribute).GetConstructor(new Type[] { typeof(string) });
@@ -51,7 +55,7 @@ namespace jNet.RPC.Client
             var propertyBuilder = typeBuilder.DefineProperty(property.Name, PropertyAttributes.HasDefault, property.PropertyType, null);
             if (property.CanRead)
             {
-                var getterMethodBuilder = typeBuilder.DefineMethod(property.GetGetMethod().Name, MethodAttributes.Virtual | MethodAttributes.Private);
+                var getterMethodBuilder = typeBuilder.DefineMethod(property.GetGetMethod().Name, MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig | MethodAttributes.NewSlot | MethodAttributes.Final | MethodAttributes.SpecialName);
                 getterMethodBuilder.SetReturnType(property.PropertyType);
                 var ilGen = getterMethodBuilder.GetILGenerator();
                 ilGen.Emit(OpCodes.Ldarg_0);
@@ -62,17 +66,46 @@ namespace jNet.RPC.Client
             }
             if (property.CanWrite)
             {
-                var setterMethodBuilder = typeBuilder.DefineMethod(property.GetSetMethod().Name, MethodAttributes.Virtual | MethodAttributes.Private);
+                var setterMethodBuilder = typeBuilder.DefineMethod(property.GetSetMethod().Name, MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig | MethodAttributes.NewSlot | MethodAttributes.Final | MethodAttributes.SpecialName);
                 setterMethodBuilder.SetParameters(property.PropertyType);
+                var setterMethod = typeBuilder.BaseType.GetMethod("Set", BindingFlags.Instance | BindingFlags.NonPublic);
                 var ilGen = setterMethodBuilder.GetILGenerator();
                 ilGen.Emit(OpCodes.Ldarg_0);
-                ilGen.Emit(OpCodes.Ldarg_1);
-                ilGen.Emit(OpCodes.Stfld, fieldBuilder);
+                ilGen.Emit(OpCodes.Ldstr, property.Name);
+                ilGen.Emit(OpCodes.Call, setterMethod);
                 ilGen.Emit(OpCodes.Ret);
                 typeBuilder.DefineMethodOverride(setterMethodBuilder, property.GetSetMethod());
                 propertyBuilder.SetSetMethod(setterMethodBuilder);
             }
             
         }
+
+        private static void AddMethod(TypeBuilder typeBuilder, MethodInfo method)
+        {
+            if (typeof(ProxyObjectBase).GetMethod(method.Name) != null)
+                return;
+            var parameters = method.GetParameters();
+            var methodBuilder = typeBuilder.DefineMethod(method.Name, MethodAttributes.Public | MethodAttributes.Virtual, method.ReturnType, parameters.Select(p => p.ParameterType).ToArray());
+            int parameterPosition = 0;
+            foreach (var parameter in parameters)
+                methodBuilder.DefineParameter(parameterPosition++, parameter.Attributes, parameter.Name);
+            var ilGen = methodBuilder.GetILGenerator();
+            var baseMethodToInvoke = typeBuilder.BaseType.GetMethod(method.ReturnType == typeof(void) ? "Invoke" : "Query", BindingFlags.Instance | BindingFlags.NonPublic);
+            ilGen.Emit(OpCodes.Ldarg_0);
+            ilGen.Emit(OpCodes.Starg, method.Name);
+            parameterPosition = 0;
+            foreach (var parameter in parameters)
+                ilGen.Emit(OpCodes.Starg_S, parameterPosition++);
+            ilGen.Emit(OpCodes.Call, baseMethodToInvoke);
+            ilGen.Emit(OpCodes.Ret);
+        }
+
+        private static void AddEvent(TypeBuilder typeBuilder, EventInfo @event)
+        {
+            if (typeof(ProxyObjectBase).GetEvent(@event.Name) != null)
+                return;
+            throw new NotImplementedException();
+        }
+
     }
 }

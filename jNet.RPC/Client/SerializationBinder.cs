@@ -25,7 +25,7 @@ namespace jNet.RPC.Client
         }
 
         private readonly List<AssemblyNamespaceMapping> _assemblyNamespaceMappings = new List<AssemblyNamespaceMapping>();
-        private readonly ConcurrentDictionary<Tuple<string, string>, Type> _typeCache = new ConcurrentDictionary<Tuple<string, string>, Type>();
+        private static readonly ConcurrentDictionary<Tuple<string, string>, Type> TypeCache = new ConcurrentDictionary<Tuple<string, string>, Type>();
 
         public void AddProxyAssembly(Assembly assembly)
         {
@@ -37,13 +37,13 @@ namespace jNet.RPC.Client
         public Type BindToType(string assemblyName, string typeName)
         {
             var key = new Tuple<string, string>(assemblyName, typeName);
-            if (_typeCache.TryGetValue(key, out var type))
+            if (TypeCache.TryGetValue(key, out var type))
                 return type;
             type = FindType(assemblyName, typeName);
             Debug.Assert(type != null);
             if (type.IsInterface)
                 type = ProxyBuilder.GetProxyTypeFor(type);
-            _typeCache.TryAdd(key, type);
+            TypeCache.TryAdd(key, type);
             return type;
         }
 
