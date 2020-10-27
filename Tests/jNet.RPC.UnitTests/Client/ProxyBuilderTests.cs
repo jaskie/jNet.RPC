@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Security.Cryptography;
 using jNet.RPC.Client;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -11,6 +10,12 @@ namespace jNet.RPC.UnitTests.Client
         int IntValueGetOnlyProperty { get; }
         int IntValueSetOnlyProperty { set; }
         int IntValueFullProperty { get; set; }
+        void VoidVoidMethod();
+        void OneParamVoidMethod(int i);
+        void TwoParamsVoidMethod(int i1, int i2);
+        void ThreeParamsVoidMethod(int i, string s, IBuildedInterface buildedInterface);
+        int OneParamIntMethod(int i);
+        int TwoParamsIntMethod(int i1, int i2);
     }
 
     public class PropertyNotFoundException : Exception
@@ -19,21 +24,10 @@ namespace jNet.RPC.UnitTests.Client
         public PropertyNotFoundException(string message) : base(message) { }
     }
 
-    public abstract class ProxyBase: IDisposable
+    public abstract class ProxyBase
     {
         private readonly Dictionary<string, object> _propertyValues = new Dictionary<string, object>();
-
-        public void Dispose()
-        {
-            
-        }
-
-        protected T Get<T>(string propertyName)
-        {
-            if (_propertyValues.TryGetValue(propertyName, out var value))
-                return (T)value;
-            throw new PropertyNotFoundException("Property is not set yet");
-        }
+        private readonly Dictionary<string, object[]> _methodInvocationParameters = new Dictionary<string, object[]>();
 
         protected void Set<T>(T value, string propertyName)
         {
@@ -42,12 +36,13 @@ namespace jNet.RPC.UnitTests.Client
 
         protected void Invoke(string methodName, params object[] parameters)
         {
-
+            _methodInvocationParameters[methodName] = parameters;
         }
 
-        protected T Query<T>(string methodName, params object[] parameters)
+        protected T Query<T>(string methodName, object[] parameters)
         {
-            return default;
+            object v = parameters.Length == 1 ? (int)parameters[0] + 1 : (int)parameters[0] + (int)parameters[1];
+            return (T)v;
         }
 
         internal T GetPropertyValue<T>(string propertyName)
@@ -56,9 +51,68 @@ namespace jNet.RPC.UnitTests.Client
                 return (T)value;
             throw new PropertyNotFoundException("Property is not set yet");
         }
+
+        internal void SetPropertyValue(object value, string propertyName)
+        {
+            var type = GetType();
+            var fieldName = $"_{propertyName.Substring(0, 1).ToLowerInvariant()}{propertyName.Substring(1)}";
+            var field = type.GetField(fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            field.SetValue(this, value);
+        }
+
+        internal object[] GetMethodInvocationParameters(string methodName)
+        {
+            return _methodInvocationParameters[methodName];
+        }
     }
 
+    public class ReferenceClass : ProxyBase, IBuildedInterface
+    {
+        private int _intValueFullProperty;
 
+        public int IntValueGetOnlyProperty => 100;
+
+        public int IntValueSetOnlyProperty { set { } }
+        public int IntValueFullProperty
+        {
+            get => _intValueFullProperty; 
+            set
+            {
+                _intValueFullProperty = value;
+                Set(value, nameof(IntValueFullProperty));
+            }
+        }
+
+        public int OneParamIntMethod(int i)
+        {
+            return i + 1;
+        }
+
+        public void OneParamVoidMethod(int i)
+        {
+            Invoke(nameof(OneParamVoidMethod), new object[] { i });
+        }
+
+        public void ThreeParamsVoidMethod(int i, string s, IBuildedInterface buildedInterface)
+        {
+            Invoke(nameof(ThreeParamsVoidMethod), new object[] { i, s, buildedInterface });
+        }
+
+        public int TwoParamsIntMethod(int i1, int i2)
+        {
+            return i1 + i2;
+        }
+
+        public void TwoParamsVoidMethod(int i1, int i2)
+        {
+            Invoke(nameof(OneParamVoidMethod), new object[] { i1, i2 });
+        }
+
+        public void VoidVoidMethod()
+        {
+            Invoke(nameof(VoidVoidMethod), new object[0]);
+        }
+    }
 
 
     [TestClass]
@@ -67,6 +121,7 @@ namespace jNet.RPC.UnitTests.Client
         private ProxyBuilder _proxyBuilder = new ProxyBuilder(typeof(ProxyBase));
         private Type _proxyType;
 
+        #region property tests
         [TestInitialize]
         public void Initialize()
         {
@@ -86,7 +141,20 @@ namespace jNet.RPC.UnitTests.Client
 
 
         [TestMethod]
-        public void PropertySet()
+        public void PropertyGetOnly()
+        {
+            var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
+            var generator = new Random();
+            for (int i = 0; i < 1000; i++)
+            {
+                var nb = generator.Next();
+                ((ProxyBase)proxy).SetPropertyValue(nb, nameof(IBuildedInterface.IntValueGetOnlyProperty));
+                Assert.AreEqual(proxy.IntValueGetOnlyProperty, nb);
+            }            
+        }
+        
+        [TestMethod]
+        public void PropertySetOnly()
         {
             var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
             var generator = new Random();
@@ -95,8 +163,7 @@ namespace jNet.RPC.UnitTests.Client
                 var nb = generator.Next();
                 proxy.IntValueSetOnlyProperty = nb;
                 Assert.AreEqual(((ProxyBase)proxy).GetPropertyValue<int>(nameof(IBuildedInterface.IntValueSetOnlyProperty)), nb);
-            }
-            
+            }            
         }
 
         [TestMethod]
@@ -111,5 +178,60 @@ namespace jNet.RPC.UnitTests.Client
                 Assert.AreEqual(nb, proxy.IntValueFullProperty);
             }
         }
+        #endregion // property tests
+
+        [TestMethod]
+        public void ParameterPassingTest()
+        {
+            var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
+            proxy.VoidVoidMethod();
+            Assert.AreEqual(((ProxyBase)proxy).GetMethodInvocationParameters(nameof(IBuildedInterface.VoidVoidMethod)).Length, 0);
+            var generator = new Random();
+            for (int i = 0; i < 100; i++)
+            {
+                var nb = generator.Next();
+                proxy.OneParamVoidMethod(nb);
+                Assert.AreEqual(nb, ((ProxyBase)proxy).GetMethodInvocationParameters(nameof(IBuildedInterface.OneParamVoidMethod))[0]);
+            }
+            for (int i = 0; i < 100; i++)
+            {
+                var nb = generator.Next();
+                proxy.TwoParamsVoidMethod(nb, nb + 1);
+                Assert.AreEqual(nb, ((ProxyBase)proxy).GetMethodInvocationParameters(nameof(IBuildedInterface.TwoParamsVoidMethod))[0]);
+                Assert.AreEqual(nb + 1, ((ProxyBase)proxy).GetMethodInvocationParameters(nameof(IBuildedInterface.TwoParamsVoidMethod))[1]);
+            }
+            for (int i = 0; i < 100; i++)
+            {
+                var nb = generator.Next();
+                var s = nb.ToString();
+                var rc = new ReferenceClass();
+                proxy.ThreeParamsVoidMethod(nb, s, rc);
+                Assert.AreEqual(nb, ((ProxyBase)proxy).GetMethodInvocationParameters(nameof(IBuildedInterface.ThreeParamsVoidMethod))[0]);
+                Assert.AreEqual(s, ((ProxyBase)proxy).GetMethodInvocationParameters(nameof(IBuildedInterface.ThreeParamsVoidMethod))[1]);
+                Assert.AreEqual(rc, ((ProxyBase)proxy).GetMethodInvocationParameters(nameof(IBuildedInterface.ThreeParamsVoidMethod))[2]);
+            }
+        }
+
+        [TestMethod]
+        public void MethodValueReturntest()
+        {
+            var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
+            var generator = new Random();
+            
+            for (int i = 0; i < 100; i++)
+            {
+                var nb = generator.Next();
+                var inc = proxy.OneParamIntMethod(nb);
+                Assert.AreEqual(nb+1, inc);
+            }
+            for (int i = 0; i < 100; i++)
+            {
+                var nb1 = generator.Next();
+                var nb2 = generator.Next();
+                var sum = proxy.TwoParamsIntMethod(nb1, nb2);
+                Assert.AreEqual(nb1 + nb2, sum);
+            }
+        }
+
     }
 }

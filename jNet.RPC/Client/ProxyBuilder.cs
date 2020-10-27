@@ -75,16 +75,16 @@ namespace jNet.RPC.Client
                 var setterMethod = typeBuilder.BaseType.GetMethod("Set", BindingFlags.Instance | BindingFlags.NonPublic).MakeGenericMethod(property.PropertyType);
                 var ilGen = setterMethodBuilder.GetILGenerator();
                 ilGen.Emit(OpCodes.Ldarg_0);
-                ilGen.Emit(OpCodes.Ldarg_1); 
-                //ilGen.Emit(OpCodes.Dup);
+                ilGen.Emit(OpCodes.Ldarg_1);
                 ilGen.Emit(OpCodes.Stfld, fieldBuilder);
-                //ilGen.Emit(OpCodes.Ldstr, property.Name);
-                //ilGen.Emit(OpCodes.Call, setterMethod);
+                ilGen.Emit(OpCodes.Ldarg_0);
+                ilGen.Emit(OpCodes.Ldarg_1);
+                ilGen.Emit(OpCodes.Ldstr, property.Name);
+                ilGen.Emit(OpCodes.Call, setterMethod);
                 ilGen.Emit(OpCodes.Ret);
                 typeBuilder.DefineMethodOverride(setterMethodBuilder, property.GetSetMethod());
                 propertyBuilder.SetSetMethod(setterMethodBuilder);
-            }
-            
+            }            
         }
 
         private void AddMethod(TypeBuilder typeBuilder, MethodInfo method)
@@ -96,23 +96,25 @@ namespace jNet.RPC.Client
             var ilGen = methodBuilder.GetILGenerator();
             ilGen.Emit(OpCodes.Ldarg_0);
             ilGen.Emit(OpCodes.Ldstr, method.Name);
-            ilGen.Emit(OpCodes.Ldc_I4_0);
+            ilGen.Emit(OpCodes.Ldc_I4, parameters.Length);
             ilGen.Emit(OpCodes.Newarr, typeof(object));
-//            ilGen.Emit(OpCodes.Dup);
-//            ilGen.Emit(OpCodes.Ldc_I4_0);
-//            ilGen.Emit(OpCodes.Ldarg_1);
-//            ilGen.Emit(OpCodes.Stelem_Ref);
-            //int parameterPosition = 0;
-            //foreach (var parameter in parameters)
-            //{
-            //    methodBuilder.DefineParameter(parameterPosition, parameter.Attributes, parameter.Name);
-            //    ilGen.Emit(OpCodes.Ldarg, parameterPosition++);
-            //}
-            var baseMethodToInvoke = typeBuilder.BaseType.GetMethod(method.ReturnType == typeof(void) ? "Invoke" : "Query", BindingFlags.Instance | BindingFlags.NonPublic);
-            //parameterPosition = 0;
-            //foreach (var parameter in parameters)
-            //    ilGen.Emit(OpCodes.Starg_S, parameterPosition++);
+            int parameterPosition = 0;
+            foreach (var parameter in parameters)
+            {
+                methodBuilder.DefineParameter(parameterPosition, parameter.Attributes, parameter.Name);
+                ilGen.Emit(OpCodes.Dup);
+                ilGen.Emit(OpCodes.Ldc_I4, parameterPosition);
+                ilGen.Emit(OpCodes.Ldarg, ++parameterPosition);
+                if (parameter.ParameterType.IsValueType)
+                    ilGen.Emit(OpCodes.Box, parameter.ParameterType);
+                ilGen.Emit(OpCodes.Stelem_Ref);
+            }
+            var baseMethodToInvoke = method.ReturnType == typeof(void) 
+                ? _proxyBaseType.GetMethod("Invoke", BindingFlags.Instance | BindingFlags.NonPublic)
+                : _proxyBaseType.GetMethod("Query", BindingFlags.Instance | BindingFlags.NonPublic).MakeGenericMethod(method.ReturnType);
+
             ilGen.Emit(OpCodes.Call, baseMethodToInvoke);
+            ilGen.Emit(OpCodes.Nop);
             ilGen.Emit(OpCodes.Ret);
             typeBuilder.DefineMethodOverride(methodBuilder, method);
         }
