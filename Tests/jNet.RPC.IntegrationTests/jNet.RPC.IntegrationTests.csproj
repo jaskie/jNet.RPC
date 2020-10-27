@@ -55,8 +55,6 @@
     <Compile Include="Client\ClientObjectBaseTests.cs" />
     <Compile Include="Communication\CommunicationTests.cs" />
     <Compile Include="Communication\ResolvingProxyTypeTests.cs" />
-    <Compile Include="Model\Client\MockMember.cs" />
-    <Compile Include="Model\Client\MockRoot.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

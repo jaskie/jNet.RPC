@@ -12,16 +12,18 @@ namespace jNet.RPC.IntegrationTests.Communication
     {
         public static IEnumerable<object[]> GetLocalTestData()
         {
-            yield return new object[] { new ServerHost(1024, new Tests.ServerLibrary.MockRoot()), new RemoteClient(), typeof(Model.Client.MockRoot) };
-            yield return new object[] { new ServerHost(1025, new Tests.ServerLibrary.Level1.MockRoot()), new RemoteClient(), typeof(Model.Client.MockRoot) };
-            yield return new object[] { new ServerHost(1026, new Tests.ServerLibrary.Level1.Level2.MockRoot()), new RemoteClient(), typeof(Model.Client.MockRoot) };            
+            yield return new object[] { new ServerHost(1024, new Tests.ServerLibrary.MockRoot()), new RemoteClient(), typeof(Tests.ClientLibrary.MockRoot) };
+            yield return new object[] { new ServerHost(1025, new Tests.ServerLibrary.Level1.MockRoot()), new RemoteClient(), typeof(Tests.ClientLibrary.Level1.MockRoot) };
+            yield return new object[] { new ServerHost(1026, new Tests.ServerLibrary.Level1.Level2.MockRoot()), new RemoteClient(), typeof(Tests.ClientLibrary.Level1.Level2.MockRoot) };            
         }        
 
         [TestMethod]
         [DynamicData(nameof(GetLocalTestData), DynamicDataSourceType.Method)]
         public void ResolveProxyTypesLocal_ProxyObjectBase(ServerHost server, RemoteClient client, Type expectedType)
         {
-            server.Start();           
+            server.Start();
+
+            client.AddProxyAssembly(typeof(Tests.ClientLibrary.MockRoot).Assembly);
             client.ConnectAsync($"127.0.0.1:{server.ListenPort}").Wait();
 
             var proxy = client.GetRootObject<IMockRoot>();
@@ -35,10 +37,10 @@ namespace jNet.RPC.IntegrationTests.Communication
 
         public static IEnumerable<object[]> GetStandardTestData()
         {
-            yield return new object[] { new ServerHost(1028, new Tests.ServerLibrary.MockRoot()), new RemoteClient(), typeof(Model.Client.MockRoot) };
+            yield return new object[] { new ServerHost(1028, new Tests.ServerLibrary.MockRoot()), new RemoteClient(), typeof(Tests.ClientLibrary.MockRoot) };
             yield return new object[] { new ServerHost(1029, new Tests.ServerLibrary.Level1.MockRoot()), new RemoteClient(), typeof(Tests.ClientLibrary.Level1.MockRoot) };
             yield return new object[] { new ServerHost(1030, new Tests.ServerLibrary.Level1.Level2.MockRoot()), new RemoteClient(), typeof(Tests.ClientLibrary.Level1.Level2.MockRoot) };
-            yield return new object[] { new ServerHost(1035, new Tests.ServerLibrary.Level1.Level2.Level3.MockRoot()), new RemoteClient(), typeof(Tests.ClientLibrary.Level1.MockRoot) }; //DtoClass Interface TestData
+            yield return new object[] { new ServerHost(1035, new Tests.ServerLibrary.Level1.Level2.Level3.MockRoot()), new RemoteClient(), typeof(Tests.ClientLibrary.Level1.Level2.Level3.MockRoot) }; //DtoClass Interface TestData
         }
 
         [TestMethod]
@@ -46,11 +48,12 @@ namespace jNet.RPC.IntegrationTests.Communication
         public void ResolveProxyTypesAnotherAssembly_ProxyObjectBase(ServerHost server, RemoteClient client, Type expectedType)
         {
             server.Start();
-            
+
+            client.AddProxyAssembly(typeof(Tests.ClientLibrary.MockRoot).Assembly);
             client.ConnectAsync($"127.0.0.1:{server.ListenPort}").Wait();
 
             var proxy = client.GetRootObject<IMockRoot>();
-            
+
             server.Dispose();
             client.Dispose();
             
@@ -60,9 +63,9 @@ namespace jNet.RPC.IntegrationTests.Communication
 
         public static IEnumerable<object[]> GetDefinedTestData()
         {
-            yield return new object[] { new ServerHost(1032, new Tests.ServerLibrary.MockRoot()), new RemoteClient(), typeof(Tests.ServerLibrary.MockRoot), typeof(Model.Client.MockRoot) };
-            yield return new object[] { new ServerHost(1033, new Tests.ServerLibrary.Level1.MockRoot()), new RemoteClient(), typeof(Tests.ServerLibrary.Level1.MockRoot), typeof(Tests.ClientLibrary.Level1.Level2.Level3.MockRoot) };
-            yield return new object[] { new ServerHost(1034, new Tests.ServerLibrary.Level1.Level2.MockRoot()), new RemoteClient(), typeof(Tests.ServerLibrary.Level1.Level2.MockRoot), typeof(Tests.ClientLibrary.Level1.MockRoot) };            
+            yield return new object[] { new ServerHost(1032, new Tests.ServerLibrary.MockRoot()), new RemoteClient(), typeof(Tests.ServerLibrary.MockRoot), typeof(Tests.ClientLibrary.MockRoot) };
+            yield return new object[] { new ServerHost(1033, new Tests.ServerLibrary.Level1.MockRoot()), new RemoteClient(), typeof(Tests.ServerLibrary.Level1.MockRoot), typeof(Tests.ClientLibrary.Level1.MockRoot) };
+            yield return new object[] { new ServerHost(1034, new Tests.ServerLibrary.Level1.Level2.MockRoot()), new RemoteClient(), typeof(Tests.ServerLibrary.Level1.Level2.MockRoot), typeof(Tests.ClientLibrary.Level1.Level2.MockRoot) };            
         }
 
         [TestMethod]
@@ -70,7 +73,8 @@ namespace jNet.RPC.IntegrationTests.Communication
         public void ResolveProxyAssignedTypes_ProxyObjectBase(ServerHost server, RemoteClient client, Type rootObjectType, Type expectedType)
         {
             server.Start();
-            
+
+            client.AddProxyAssembly(typeof(Tests.ClientLibrary.MockRoot).Assembly);
             client.ConnectAsync($"127.0.0.1:{server.ListenPort}").Wait();
 
             var proxy = client.GetRootObject<IMockRoot>();

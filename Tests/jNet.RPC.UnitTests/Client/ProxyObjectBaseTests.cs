@@ -38,7 +38,7 @@ namespace jNet.RPC.UnitTests.Client
                 var priv = new PrivateObject(target, new PrivateType(typeof(ProxyObjectBase)));
 
                 Assert.IsTrue(ProxyObjectBase.FinalizeRequested.ContainsKey(target.DtoGuid), "Object did not save itself!");            
-                Assert.IsTrue((bool)priv.GetField("_finalizeRequested"), "Object not prepared for collection!");
+                Assert.IsFalse((int)priv.GetField("_isFinalizeRequested") == default, "Object not prepared for collection!");
 
                 ProxyObjectBase.FinalizeRequested.TryRemove(target.DtoGuid, out _);
             })();
@@ -60,7 +60,7 @@ namespace jNet.RPC.UnitTests.Client
             
             _mockProxy.FinalizeProxy();
             Assert.IsFalse(ProxyObjectBase.FinalizeRequested.ContainsKey(_mockProxy.DtoGuid), "FinalizeRequests should not contain this element!");
-            Assert.IsTrue((bool)_mockBase.GetField("_finalizeRequested")); 
+            Assert.IsTrue((int)_mockBase.GetField("_isFinalizeRequested") == default); 
         }
 
         [TestMethod]

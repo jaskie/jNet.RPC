@@ -60,7 +60,8 @@ namespace jNet.RPC.UnitTests.Client
             var knownDtosInitialCount = _knownDtos.Count;
             _clientReferenceResolver.AddReference(this, _mockObject.DtoGuid.ToString(), _mockObject);
             PrivateObject po = new PrivateObject(_clientReferenceResolver);
-            Assert.AreEqual(po.GetArrayElement("_proxiesToPopulate", 0), _mockObject, "Wrong object added to population.");
+            var dict = (Dictionary<Guid, ProxyObjectBase>)po.GetField("_proxiesToPopulate");
+            Assert.AreEqual(dict[_mockObject.DtoGuid], _mockObject, "Wrong object added to population.");
             Assert.AreEqual(knownDtosInitialCount, _knownDtos.Count, "KnownDtos shouldn't increased!");
         }
         #endregion
@@ -121,7 +122,8 @@ namespace jNet.RPC.UnitTests.Client
                 guid = new Guid(mockObject.DtoGuid.ToString());
             })();
 
-            GC.Collect();
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true);
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true);
             GC.WaitForPendingFinalizers();
 
             if (ProxyObjectBase.FinalizeRequested.Count < 1)

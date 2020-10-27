@@ -23,6 +23,7 @@ namespace jNet.RPC.IntegrationTests.Communication
             _server.Start();
 
             _client = new RemoteClient();
+            _client.AddProxyAssembly(typeof(Tests.ClientLibrary.MockRoot).Assembly);
             await _client.ConnectAsync("127.0.0.1:1100");
         }
 
