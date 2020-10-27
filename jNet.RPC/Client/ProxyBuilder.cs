@@ -5,23 +5,27 @@ using System.Reflection.Emit;
 
 namespace jNet.RPC.Client
 {
-    internal static class ProxyBuilder
+    internal class ProxyBuilder
     {
         const string GeneratedAssemblyName = "jNet.RPC.Client.GeneratedProxies";
 
-        static readonly ModuleBuilder ModuleBuilder;
+        private readonly ModuleBuilder _moduleBuilder;
+        private readonly AssemblyBuilder _asmBuilder;
+        private readonly Type _proxyBaseType;
 
-        static ProxyBuilder()
+
+        public ProxyBuilder(Type proxyBaseType)
         {
             AssemblyName asmName = new AssemblyName(GeneratedAssemblyName);
-            AssemblyBuilder asmBuilder = AppDomain.CurrentDomain.DefineDynamicAssembly(asmName, AssemblyBuilderAccess.RunAndSave);
-            ModuleBuilder = asmBuilder.DefineDynamicModule(GeneratedAssemblyName, $"{GeneratedAssemblyName}.dll");
+            _asmBuilder = AppDomain.CurrentDomain.DefineDynamicAssembly(asmName, AssemblyBuilderAccess.RunAndSave);
+            _moduleBuilder = _asmBuilder.DefineDynamicModule(GeneratedAssemblyName, $"{GeneratedAssemblyName}.dll");
+            _proxyBaseType = proxyBaseType;
         }
 
-        public static Type GetProxyTypeFor(Type interfaceType)
+        public Type GetProxyTypeFor(Type interfaceType)
         {
             var typeName = $"{GeneratedAssemblyName}.{(interfaceType.Name.StartsWith("I") ? interfaceType.Name.Substring(1) : interfaceType.Name)}";
-            TypeBuilder typeBuilder = ModuleBuilder.DefineType(typeName, TypeAttributes.Class | TypeAttributes.Public, typeof(ProxyObjectBase));
+            TypeBuilder typeBuilder = _moduleBuilder.DefineType(typeName, TypeAttributes.Class | TypeAttributes.Public, _proxyBaseType);
             typeBuilder.AddInterfaceImplementation(interfaceType);
             AddMethodOnEventNotification(typeBuilder);
             var implementedInterfaces = (new Type[] { interfaceType }).Concat(interfaceType.GetInterfaces()).ToArray();
@@ -35,7 +39,7 @@ namespace jNet.RPC.Client
             return typeBuilder.CreateType();
         }
 
-        private static void AddMethodOnEventNotification(TypeBuilder typeBuilder)
+        private void AddMethodOnEventNotification(TypeBuilder typeBuilder)
         {
             var methodBuilderOnEventNotification = typeBuilder.DefineMethod("OnEventNotification", MethodAttributes.Virtual | MethodAttributes.Family, typeof(void), new Type[] { typeof(SocketMessage) });
             var ilGen = methodBuilderOnEventNotification.GetILGenerator();
@@ -43,9 +47,9 @@ namespace jNet.RPC.Client
             ilGen.Emit(OpCodes.Ret);
         }
 
-        private static void AddProperty(TypeBuilder typeBuilder, PropertyInfo property)
+        private void AddProperty(TypeBuilder typeBuilder, PropertyInfo property)
         {
-            if (typeof(ProxyObjectBase).GetProperty(property.Name) != null)
+            if (_proxyBaseType.GetProperty(property.Name) != null)
                 return;
             var fieldName = $"_{property.Name[0].ToString().ToLowerInvariant()}{property.Name.Substring(1)}";
             var fieldBuilder = typeBuilder.DefineField(fieldName, property.PropertyType, FieldAttributes.Private);
@@ -68,11 +72,14 @@ namespace jNet.RPC.Client
             {
                 var setterMethodBuilder = typeBuilder.DefineMethod(property.GetSetMethod().Name, MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig | MethodAttributes.NewSlot | MethodAttributes.Final | MethodAttributes.SpecialName);
                 setterMethodBuilder.SetParameters(property.PropertyType);
-                var setterMethod = typeBuilder.BaseType.GetMethod("Set", BindingFlags.Instance | BindingFlags.NonPublic);
+                var setterMethod = typeBuilder.BaseType.GetMethod("Set", BindingFlags.Instance | BindingFlags.NonPublic).MakeGenericMethod(property.PropertyType);
                 var ilGen = setterMethodBuilder.GetILGenerator();
                 ilGen.Emit(OpCodes.Ldarg_0);
-                ilGen.Emit(OpCodes.Ldstr, property.Name);
-                ilGen.Emit(OpCodes.Call, setterMethod);
+                ilGen.Emit(OpCodes.Ldarg_1); 
+                //ilGen.Emit(OpCodes.Dup);
+                ilGen.Emit(OpCodes.Stfld, fieldBuilder);
+                //ilGen.Emit(OpCodes.Ldstr, property.Name);
+                //ilGen.Emit(OpCodes.Call, setterMethod);
                 ilGen.Emit(OpCodes.Ret);
                 typeBuilder.DefineMethodOverride(setterMethodBuilder, property.GetSetMethod());
                 propertyBuilder.SetSetMethod(setterMethodBuilder);
@@ -80,29 +87,39 @@ namespace jNet.RPC.Client
             
         }
 
-        private static void AddMethod(TypeBuilder typeBuilder, MethodInfo method)
+        private void AddMethod(TypeBuilder typeBuilder, MethodInfo method)
         {
-            if (typeof(ProxyObjectBase).GetMethod(method.Name) != null)
+            if (_proxyBaseType.GetMethod(method.Name) != null)
                 return;
             var parameters = method.GetParameters();
-            var methodBuilder = typeBuilder.DefineMethod(method.Name, MethodAttributes.Public | MethodAttributes.Virtual, method.ReturnType, parameters.Select(p => p.ParameterType).ToArray());
-            int parameterPosition = 0;
-            foreach (var parameter in parameters)
-                methodBuilder.DefineParameter(parameterPosition++, parameter.Attributes, parameter.Name);
+            var methodBuilder = typeBuilder.DefineMethod(method.Name, MethodAttributes.Public| MethodAttributes.Virtual | MethodAttributes.HideBySig | MethodAttributes.NewSlot | MethodAttributes.Final, method.ReturnType, parameters.Select(p => p.ParameterType).ToArray());
             var ilGen = methodBuilder.GetILGenerator();
-            var baseMethodToInvoke = typeBuilder.BaseType.GetMethod(method.ReturnType == typeof(void) ? "Invoke" : "Query", BindingFlags.Instance | BindingFlags.NonPublic);
             ilGen.Emit(OpCodes.Ldarg_0);
-            ilGen.Emit(OpCodes.Starg, method.Name);
-            parameterPosition = 0;
-            foreach (var parameter in parameters)
-                ilGen.Emit(OpCodes.Starg_S, parameterPosition++);
+            ilGen.Emit(OpCodes.Ldstr, method.Name);
+            ilGen.Emit(OpCodes.Ldc_I4_0);
+            ilGen.Emit(OpCodes.Newarr, typeof(object));
+//            ilGen.Emit(OpCodes.Dup);
+//            ilGen.Emit(OpCodes.Ldc_I4_0);
+//            ilGen.Emit(OpCodes.Ldarg_1);
+//            ilGen.Emit(OpCodes.Stelem_Ref);
+            //int parameterPosition = 0;
+            //foreach (var parameter in parameters)
+            //{
+            //    methodBuilder.DefineParameter(parameterPosition, parameter.Attributes, parameter.Name);
+            //    ilGen.Emit(OpCodes.Ldarg, parameterPosition++);
+            //}
+            var baseMethodToInvoke = typeBuilder.BaseType.GetMethod(method.ReturnType == typeof(void) ? "Invoke" : "Query", BindingFlags.Instance | BindingFlags.NonPublic);
+            //parameterPosition = 0;
+            //foreach (var parameter in parameters)
+            //    ilGen.Emit(OpCodes.Starg_S, parameterPosition++);
             ilGen.Emit(OpCodes.Call, baseMethodToInvoke);
             ilGen.Emit(OpCodes.Ret);
+            typeBuilder.DefineMethodOverride(methodBuilder, method);
         }
 
-        private static void AddEvent(TypeBuilder typeBuilder, EventInfo @event)
+        private void AddEvent(TypeBuilder typeBuilder, EventInfo @event)
         {
-            if (typeof(ProxyObjectBase).GetEvent(@event.Name) != null)
+            if (_proxyBaseType.GetEvent(@event.Name) != null)
                 return;
             throw new NotImplementedException();
         }

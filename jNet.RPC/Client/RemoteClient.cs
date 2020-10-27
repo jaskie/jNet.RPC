@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json.Serialization;
+using System;
 using System.Reflection;
 
 namespace jNet.RPC.Client
@@ -10,6 +11,11 @@ namespace jNet.RPC.Client
         public RemoteClient() : base()
         {
             Serializer.SerializationBinder = new SerializationBinder();
+        }
+
+        public RemoteClient(ISerializationBinder serializationBinder) : base()
+        {
+            Serializer.SerializationBinder = serializationBinder;
         }
 
         public void AddProxyAssembly(Assembly assembly)

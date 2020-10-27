@@ -26,6 +26,7 @@ namespace jNet.RPC.Client
 
         private readonly List<AssemblyNamespaceMapping> _assemblyNamespaceMappings = new List<AssemblyNamespaceMapping>();
         private static readonly ConcurrentDictionary<Tuple<string, string>, Type> TypeCache = new ConcurrentDictionary<Tuple<string, string>, Type>();
+        private static readonly ProxyBuilder ProxyBuilder = new ProxyBuilder(typeof(ProxyObjectBase));
 
         public void AddProxyAssembly(Assembly assembly)
         {

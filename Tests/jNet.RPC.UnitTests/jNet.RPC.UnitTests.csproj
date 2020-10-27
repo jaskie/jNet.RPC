@@ -51,6 +51,7 @@
   <ItemGroup>
     <Compile Include="Client\ClientReferenceResolverTests.cs" />
     <Compile Include="Client\ProxyObjectBaseTests.cs" />
+    <Compile Include="Client\ProxyBuilderTests.cs" />
     <Compile Include="MockModel\MockProxyObject.cs" />
     <Compile Include="MockModel\MockServerObject.cs" />
     <Compile Include="Server\DtoBaseTests.cs" />
