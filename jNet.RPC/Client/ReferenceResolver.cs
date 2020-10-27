@@ -72,7 +72,8 @@ namespace jNet.RPC.Client
                     if (!value.TryGetTarget(out var target))
                     {
                         Logger.Debug("Could not get target {0}", id);
-                        ProxyObjectBase.TryResurect(id, out _);
+                        if (ProxyObjectBase.TryResurect(id, out target))
+                            return target;
                     }
                     Logger.Trace("Resolved reference {0} with {1}", reference, value);
 
