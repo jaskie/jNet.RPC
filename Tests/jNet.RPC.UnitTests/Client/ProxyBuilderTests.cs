@@ -16,6 +16,7 @@ namespace jNet.RPC.UnitTests.Client
         void ThreeParamsVoidMethod(int i, string s, IBuildedInterface buildedInterface);
         int OneParamIntMethod(int i);
         int TwoParamsIntMethod(int i1, int i2);
+        event EventHandler SimpleEvent;
     }
 
     public class PropertyNotFoundException : Exception
@@ -45,6 +46,26 @@ namespace jNet.RPC.UnitTests.Client
             return (T)v;
         }
 
+        protected void EventAdd<T>(T handler, string eventName)
+        {
+
+        }
+
+        protected void EventRemove<T>(T handler, string eventName)
+        {
+
+        }
+
+        protected void OnEventNotification(SocketMessage message)
+        {
+
+        }
+
+        protected T Deserialize<T>(SocketMessage message) where T: new()
+        {
+            return new T();
+        }
+
         internal T GetPropertyValue<T>(string propertyName)
         {
             if (_propertyValues.TryGetValue(propertyName, out var value))
@@ -64,56 +85,18 @@ namespace jNet.RPC.UnitTests.Client
         {
             return _methodInvocationParameters[methodName];
         }
+
+        internal void RaiseEvent(string eventName)
+        {
+            var fieldName = $"_{eventName.Substring(0, 1).ToLowerInvariant()}{eventName.Substring(1)}";
+            var fieldInfo = GetType().GetField(fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var delegateValue = fieldInfo.GetValue(this) as Delegate;
+            if (delegateValue != null)
+                delegateValue.Method.Invoke(delegateValue.Target, new object[] { this, EventArgs.Empty});
+        }
+
+        
     }
-
-    public class ReferenceClass : ProxyBase, IBuildedInterface
-    {
-        private int _intValueFullProperty;
-
-        public int IntValueGetOnlyProperty => 100;
-
-        public int IntValueSetOnlyProperty { set { } }
-        public int IntValueFullProperty
-        {
-            get => _intValueFullProperty; 
-            set
-            {
-                _intValueFullProperty = value;
-                Set(value, nameof(IntValueFullProperty));
-            }
-        }
-
-        public int OneParamIntMethod(int i)
-        {
-            return i + 1;
-        }
-
-        public void OneParamVoidMethod(int i)
-        {
-            Invoke(nameof(OneParamVoidMethod), new object[] { i });
-        }
-
-        public void ThreeParamsVoidMethod(int i, string s, IBuildedInterface buildedInterface)
-        {
-            Invoke(nameof(ThreeParamsVoidMethod), new object[] { i, s, buildedInterface });
-        }
-
-        public int TwoParamsIntMethod(int i1, int i2)
-        {
-            return i1 + i2;
-        }
-
-        public void TwoParamsVoidMethod(int i1, int i2)
-        {
-            Invoke(nameof(OneParamVoidMethod), new object[] { i1, i2 });
-        }
-
-        public void VoidVoidMethod()
-        {
-            Invoke(nameof(VoidVoidMethod), new object[0]);
-        }
-    }
-
 
     [TestClass]
     public class ProxyBuilderTests
@@ -181,7 +164,7 @@ namespace jNet.RPC.UnitTests.Client
         #endregion // property tests
 
         [TestMethod]
-        public void ParameterPassingTest()
+        public void ParameterPassing()
         {
             var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
             proxy.VoidVoidMethod();
@@ -204,16 +187,16 @@ namespace jNet.RPC.UnitTests.Client
             {
                 var nb = generator.Next();
                 var s = nb.ToString();
-                var rc = new ReferenceClass();
-                proxy.ThreeParamsVoidMethod(nb, s, rc);
+
+                proxy.ThreeParamsVoidMethod(nb, s, proxy);
                 Assert.AreEqual(nb, ((ProxyBase)proxy).GetMethodInvocationParameters(nameof(IBuildedInterface.ThreeParamsVoidMethod))[0]);
                 Assert.AreEqual(s, ((ProxyBase)proxy).GetMethodInvocationParameters(nameof(IBuildedInterface.ThreeParamsVoidMethod))[1]);
-                Assert.AreEqual(rc, ((ProxyBase)proxy).GetMethodInvocationParameters(nameof(IBuildedInterface.ThreeParamsVoidMethod))[2]);
+                Assert.AreEqual(proxy, ((ProxyBase)proxy).GetMethodInvocationParameters(nameof(IBuildedInterface.ThreeParamsVoidMethod))[2]);
             }
         }
 
         [TestMethod]
-        public void MethodValueReturntest()
+        public void MethodValueReturn()
         {
             var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
             var generator = new Random();
@@ -231,6 +214,23 @@ namespace jNet.RPC.UnitTests.Client
                 var sum = proxy.TwoParamsIntMethod(nb1, nb2);
                 Assert.AreEqual(nb1 + nb2, sum);
             }
+        }
+
+        [TestMethod]
+        public void SimpleEventInvokation()
+        {
+            var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
+            int i = 0;
+            EventHandler eventHandler = new EventHandler((s, e) =>
+            {
+                i++;
+            });
+            proxy.SimpleEvent += eventHandler;
+            ((ProxyBase)proxy).RaiseEvent(nameof(IBuildedInterface.SimpleEvent));
+            Assert.AreEqual(1, i);
+            proxy.SimpleEvent -= eventHandler;
+            ((ProxyBase)proxy).RaiseEvent(nameof(IBuildedInterface.SimpleEvent));
+            Assert.AreEqual(1, i);
         }
 
     }

@@ -24,7 +24,7 @@ namespace jNet.RPC.Client
 
         public Type GetProxyTypeFor(Type interfaceType)
         {
-            var typeName = $"{GeneratedAssemblyName}.{(interfaceType.Name.StartsWith("I") ? interfaceType.Name.Substring(1) : interfaceType.Name)}";
+            var typeName = $"{GeneratedAssemblyName}.{interfaceType.FullName}";
             TypeBuilder typeBuilder = _moduleBuilder.DefineType(typeName, TypeAttributes.Class | TypeAttributes.Public, _proxyBaseType);
             typeBuilder.AddInterfaceImplementation(interfaceType);
             AddMethodOnEventNotification(typeBuilder);
@@ -84,7 +84,7 @@ namespace jNet.RPC.Client
                 ilGen.Emit(OpCodes.Ret);
                 typeBuilder.DefineMethodOverride(setterMethodBuilder, property.GetSetMethod());
                 propertyBuilder.SetSetMethod(setterMethodBuilder);
-            }            
+            }
         }
 
         private void AddMethod(TypeBuilder typeBuilder, MethodInfo method)
@@ -92,7 +92,7 @@ namespace jNet.RPC.Client
             if (_proxyBaseType.GetMethod(method.Name) != null)
                 return;
             var parameters = method.GetParameters();
-            var methodBuilder = typeBuilder.DefineMethod(method.Name, MethodAttributes.Public| MethodAttributes.Virtual | MethodAttributes.HideBySig | MethodAttributes.NewSlot | MethodAttributes.Final, method.ReturnType, parameters.Select(p => p.ParameterType).ToArray());
+            var methodBuilder = typeBuilder.DefineMethod(method.Name, MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig | MethodAttributes.NewSlot | MethodAttributes.Final, method.ReturnType, parameters.Select(p => p.ParameterType).ToArray());
             var ilGen = methodBuilder.GetILGenerator();
             ilGen.Emit(OpCodes.Ldarg_0);
             ilGen.Emit(OpCodes.Ldstr, method.Name);
@@ -109,7 +109,7 @@ namespace jNet.RPC.Client
                     ilGen.Emit(OpCodes.Box, parameter.ParameterType);
                 ilGen.Emit(OpCodes.Stelem_Ref);
             }
-            var baseMethodToInvoke = method.ReturnType == typeof(void) 
+            var baseMethodToInvoke = method.ReturnType == typeof(void)
                 ? _proxyBaseType.GetMethod("Invoke", BindingFlags.Instance | BindingFlags.NonPublic)
                 : _proxyBaseType.GetMethod("Query", BindingFlags.Instance | BindingFlags.NonPublic).MakeGenericMethod(method.ReturnType);
 
@@ -119,11 +119,64 @@ namespace jNet.RPC.Client
             typeBuilder.DefineMethodOverride(methodBuilder, method);
         }
 
-        private void AddEvent(TypeBuilder typeBuilder, EventInfo @event)
+        private void AddEvent(TypeBuilder typeBuilder, EventInfo ev)
         {
-            if (_proxyBaseType.GetEvent(@event.Name) != null)
+            if (_proxyBaseType.GetEvent(ev.Name) != null)
                 return;
-            throw new NotImplementedException();
+            var eventType = ev.EventHandlerType;
+            var field = typeBuilder.DefineField($"_{ev.Name.Substring(0, 1).ToLowerInvariant()}{ev.Name.Substring(1)}", eventType, FieldAttributes.Private);
+            var eventInfo = typeBuilder.DefineEvent(ev.Name, EventAttributes.None, eventType);
+
+            // adding add method
+            var addMethod = typeBuilder.DefineMethod($"add_{ev.Name}",
+                MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.SpecialName | MethodAttributes.Final | MethodAttributes.HideBySig | MethodAttributes.NewSlot,
+                CallingConventions.Standard | CallingConventions.HasThis,
+                typeof(void),
+                new[] { eventType });
+            var addMethodGenerator = addMethod.GetILGenerator();
+            var combine = typeof(Delegate).GetMethod(nameof(Delegate.Combine), new[] { typeof(Delegate), typeof(Delegate) });
+            var eventAddMethod = _proxyBaseType.GetMethod("EventAdd", BindingFlags.Instance | BindingFlags.NonPublic).MakeGenericMethod(eventType);
+            addMethodGenerator.Emit(OpCodes.Ldarg_0);
+            addMethodGenerator.Emit(OpCodes.Ldarg_0);
+            addMethodGenerator.Emit(OpCodes.Ldfld, field);
+            addMethodGenerator.Emit(OpCodes.Ldstr, ev.Name);
+            addMethodGenerator.Emit(OpCodes.Call, eventAddMethod);
+
+            addMethodGenerator.Emit(OpCodes.Ldarg_0);
+            addMethodGenerator.Emit(OpCodes.Ldarg_0);
+            addMethodGenerator.Emit(OpCodes.Ldfld, field);
+            addMethodGenerator.Emit(OpCodes.Ldarg_1);
+            addMethodGenerator.Emit(OpCodes.Call, combine);
+            addMethodGenerator.Emit(OpCodes.Castclass, eventType);
+            addMethodGenerator.Emit(OpCodes.Stfld, field);
+            addMethodGenerator.Emit(OpCodes.Ret);
+            eventInfo.SetAddOnMethod(addMethod);
+
+            var removeMethod = typeBuilder.DefineMethod($"remove_{ev.Name}",
+                MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.SpecialName | MethodAttributes.Final | MethodAttributes.HideBySig | MethodAttributes.NewSlot,
+                CallingConventions.Standard | CallingConventions.HasThis,
+                typeof(void),
+                new[] { eventType });
+            var remove = typeof(Delegate).GetMethod(nameof(Delegate.Remove), new[] { typeof(Delegate), typeof(Delegate) });
+            var removeMethodGenerator = removeMethod.GetILGenerator();
+            removeMethodGenerator.Emit(OpCodes.Ldarg_0);
+            removeMethodGenerator.Emit(OpCodes.Ldarg_0);
+            removeMethodGenerator.Emit(OpCodes.Ldfld, field);
+            removeMethodGenerator.Emit(OpCodes.Ldarg_1);
+            removeMethodGenerator.Emit(OpCodes.Call, remove);
+            removeMethodGenerator.Emit(OpCodes.Castclass, eventType);
+            removeMethodGenerator.Emit(OpCodes.Stfld, field);
+
+            var eventRemoveMethod = _proxyBaseType.GetMethod("EventRemove", BindingFlags.Instance | BindingFlags.NonPublic).MakeGenericMethod(eventType);
+            removeMethodGenerator.Emit(OpCodes.Ldarg_0);
+            removeMethodGenerator.Emit(OpCodes.Ldarg_0);
+            removeMethodGenerator.Emit(OpCodes.Ldfld, field);
+            removeMethodGenerator.Emit(OpCodes.Ldstr, ev.Name);
+            removeMethodGenerator.Emit(OpCodes.Call, eventRemoveMethod);
+
+            removeMethodGenerator.Emit(OpCodes.Ret);
+            eventInfo.SetRemoveOnMethod(removeMethod);
+
         }
 
     }
