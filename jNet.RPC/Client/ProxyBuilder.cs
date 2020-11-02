@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -27,31 +29,163 @@ namespace jNet.RPC.Client
             var typeName = $"{GeneratedAssemblyName}.{interfaceType.FullName}";
             TypeBuilder typeBuilder = _moduleBuilder.DefineType(typeName, TypeAttributes.Class | TypeAttributes.Public, _proxyBaseType);
             typeBuilder.AddInterfaceImplementation(interfaceType);
-            AddMethodOnEventNotification(typeBuilder);
             var implementedInterfaces = (new Type[] { interfaceType }).Concat(interfaceType.GetInterfaces()).ToArray();
             var interfaceProperties = implementedInterfaces.SelectMany(i => i.GetProperties()).Distinct().ToArray();
             foreach (var property in interfaceProperties)
                 AddProperty(typeBuilder, property);
             foreach (var method in implementedInterfaces.SelectMany(i => i.GetMethods().Where(m => !m.IsSpecialName)).Distinct())
                 AddMethod(typeBuilder, method);
-            foreach (var @event in implementedInterfaces.SelectMany(i => i.GetEvents()).Distinct())
-                AddEvent(typeBuilder, @event);
+            var events = implementedInterfaces.SelectMany(i => i.GetEvents()).Distinct()
+                .Where(i => _proxyBaseType.GetEvent(i.Name) == null)
+                .ToArray();
+            var fields = new FieldBuilder[events.Length];
+            for (int i = 0; i < events.Length; i++)
+                fields[i] = AddEvent(typeBuilder, events[i]);
+            AddMethodOnEventNotification(typeBuilder, events, fields);
             return typeBuilder.CreateType();
         }
 
-        private void AddMethodOnEventNotification(TypeBuilder typeBuilder)
+        private void AddMethodOnEventNotification(TypeBuilder typeBuilder, EventInfo[] events, FieldInfo[] eventFields)
         {
-            var methodBuilderOnEventNotification = typeBuilder.DefineMethod("OnEventNotification", MethodAttributes.Virtual | MethodAttributes.Family, typeof(void), new Type[] { typeof(SocketMessage) });
-            var ilGen = methodBuilderOnEventNotification.GetILGenerator();
-            ilGen.Emit(OpCodes.Ldarg_0);
+            var originalMethod = _proxyBaseType.GetMethod("OnEventNotification", BindingFlags.Instance | BindingFlags.NonPublic);
+            var method = typeBuilder.DefineMethod(originalMethod.Name, MethodAttributes.Virtual | MethodAttributes.Family, typeof(void), new Type[] { typeof(SocketMessage) });
+            var deserializeMethod = _proxyBaseType.GetMethod("Deserialize", BindingFlags.Instance | BindingFlags.NonPublic);
+            var stringEquals = typeof(string).GetMethod(nameof(string.Equals), BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(string), typeof(string) }, null);
+            var parameter = method.DefineParameter(0, ParameterAttributes.In, "message");
+            var memberNameField = typeof(SocketMessage).GetField(nameof(SocketMessage.MemberName));
+            var ilGen = method.GetILGenerator();
+            var caseLabels = events.Select(l => ilGen.DefineLabel()).ToArray();
+            var retLabel = ilGen.DefineLabel();
+            ilGen.Emit(OpCodes.Ldarg_1);
+            ilGen.Emit(OpCodes.Ldfld, memberNameField);
+            ilGen.Emit(OpCodes.Stloc_1);
+            ilGen.Emit(OpCodes.Ldloc_1);
+            ilGen.Emit(OpCodes.Stloc_0);
+            ilGen.Emit(OpCodes.Ldloc_0);
+            ilGen.Emit(OpCodes.Brfalse, retLabel);
+           
+            for (int i =  0; i < events.Length; i++)
+            {
+                var ev = events[i];
+                ilGen.Emit(OpCodes.Ldloc_0);
+                ilGen.Emit(OpCodes.Ldstr, ev.Name);
+                ilGen.Emit(OpCodes.Call, stringEquals);
+                ilGen.Emit(OpCodes.Brtrue_S, caseLabels[i]);
+            }
+            
+            for (int i = 0; i < events.Length; i++)
+            {
+                ilGen.Emit(OpCodes.Br_S, retLabel);
+                ilGen.MarkLabel(caseLabels[i]);
+                ilGen.Emit(OpCodes.Ldarg_0);
+                ilGen.Emit(OpCodes.Ldfld, eventFields[i]);
+                ilGen.Emit(OpCodes.Dup);
+                var invokeLabel = ilGen.DefineLabel();
+                ilGen.Emit(OpCodes.Brtrue_S, invokeLabel);
+                ilGen.Emit(OpCodes.Pop);
+                ilGen.Emit(OpCodes.Ret);
+                ilGen.MarkLabel(invokeLabel);
+                if (events[i].EventHandlerType.IsGenericType)
+                {
+                //    ilGen.Emit(OpCodes.Ldarg_0);
+                //    ilGen.Emit(OpCodes.Ldarg_1);
+                //    var m = deserializeMethod.MakeGenericMethod(events[i].EventHandlerType.GenericTypeArguments);
+                //    ilGen.Emit(OpCodes.Call, m);
+                } else
+                {
+                    ilGen.Emit(OpCodes.Ldarg_0);
+                    ilGen.Emit(OpCodes.Ldarg_0);
+                    ilGen.Emit(OpCodes.Ldsfld, typeof(EventArgs).GetField(nameof(EventArgs.Empty), BindingFlags.Static | BindingFlags.Public));
+                }
+
+                var eventHandlerMethod = events[i].EventHandlerType.GetMethod(nameof(EventHandler.Invoke));
+                ilGen.Emit(OpCodes.Callvirt, eventHandlerMethod);
+            }
+                
+            ilGen.MarkLabel(retLabel);
             ilGen.Emit(OpCodes.Ret);
+            //typeBuilder.DefineMethodOverride(method, originalMethod);
         }
+
+        /* 
+         * Sample for Engine
+        .method family hidebysig virtual instance void 
+        OnEventNotification(class [jNet.RPC]jNet.RPC.SocketMessage message) cil managed
+        {
+         // Method begins at RVA 0x2248
+                // Code size 129 (0x81)
+                .maxstack 4
+
+                IL_0000: ldarg.1
+                IL_0001: ldfld string SocketMessage::MemberName
+                IL_0006: ldstr "OperationAdded"
+                IL_000b: call bool [System.Private.CoreLib]System.String::op_Equality(string, string)
+                IL_0010: brfalse.s IL_002b
+
+                IL_0012: ldarg.0
+                IL_0013: ldfld class [System.Private.CoreLib]System.EventHandler`1<class FileOperationEventArgs> FileManager::_operationAdded
+                IL_0018: dup
+                IL_0019: brtrue.s IL_001e
+
+                IL_001b: pop
+                IL_001c: br.s IL_002b
+
+                IL_001e: ldarg.0
+                IL_001f: ldarg.0
+                IL_0020: ldarg.1
+                IL_0021: call instance !!0 ProxyObjectBase::Deserialize<class FileOperationEventArgs>(class SocketMessage)
+                IL_0026: callvirt instance void class [System.Private.CoreLib]System.EventHandler`1<class FileOperationEventArgs>::Invoke(object, !0)
+
+                IL_002b: ldarg.1
+                IL_002c: ldfld string SocketMessage::MemberName
+                IL_0031: ldstr "OperationCompleted"
+                IL_0036: call bool [System.Private.CoreLib]System.String::op_Equality(string, string)
+                IL_003b: brfalse.s IL_0056
+
+                IL_003d: ldarg.0
+                IL_003e: ldfld class [System.Private.CoreLib]System.EventHandler`1<class FileOperationEventArgs> FileManager::_operationCompleted
+                IL_0043: dup
+                IL_0044: brtrue.s IL_0049
+
+                IL_0046: pop
+                IL_0047: br.s IL_0056
+
+                IL_0049: ldarg.0
+                IL_004a: ldarg.0
+                IL_004b: ldarg.1
+                IL_004c: call instance !!0 ProxyObjectBase::Deserialize<class FileOperationEventArgs>(class SocketMessage)
+                IL_0051: callvirt instance void class [System.Private.CoreLib]System.EventHandler`1<class FileOperationEventArgs>::Invoke(object, !0)
+
+                IL_0056: ldarg.1
+                IL_0057: ldfld string SocketMessage::MemberName
+                IL_005c: ldstr "test3"
+                IL_0061: call bool [System.Private.CoreLib]System.String::op_Equality(string, string)
+                IL_0066: brfalse.s IL_0080
+
+                IL_0068: ldarg.0
+                IL_0069: ldfld class [System.Private.CoreLib]System.EventHandler`1<class FileOperationEventArgs> FileManager::_operationCompleted
+                IL_006e: dup
+                IL_006f: brtrue.s IL_0073
+
+                IL_0071: pop
+                IL_0072: ret
+
+                IL_0073: ldarg.0
+                IL_0074: ldarg.0
+                IL_0075: ldarg.1
+                IL_0076: call instance !!0 ProxyObjectBase::Deserialize<class FileOperationEventArgs>(class SocketMessage)
+                IL_007b: callvirt instance void class [System.Private.CoreLib]System.EventHandler`1<class FileOperationEventArgs>::Invoke(object, !0)
+
+                IL_0080: ret
+        } // end of method Engine::OnEventNotification
+
+                 */
 
         private void AddProperty(TypeBuilder typeBuilder, PropertyInfo property)
         {
             if (_proxyBaseType.GetProperty(property.Name) != null)
                 return;
-            var fieldName = $"_{property.Name[0].ToString().ToLowerInvariant()}{property.Name.Substring(1)}";
+            var fieldName = ToUnderscoreLowerCase(property.Name);
             var fieldBuilder = typeBuilder.DefineField(fieldName, property.PropertyType, FieldAttributes.Private);
             ConstructorInfo fieldDtoMemberAttrInfo = typeof(DtoMemberAttribute).GetConstructor(new Type[] { typeof(string) });
             CustomAttributeBuilder fieldDtoMemberAttributeBuilder = new CustomAttributeBuilder(fieldDtoMemberAttrInfo, new object[] { property.Name });
@@ -119,12 +253,10 @@ namespace jNet.RPC.Client
             typeBuilder.DefineMethodOverride(methodBuilder, method);
         }
 
-        private void AddEvent(TypeBuilder typeBuilder, EventInfo ev)
+        private FieldBuilder AddEvent(TypeBuilder typeBuilder, EventInfo ev)
         {
-            if (_proxyBaseType.GetEvent(ev.Name) != null)
-                return;
             var eventType = ev.EventHandlerType;
-            var field = typeBuilder.DefineField($"_{ev.Name.Substring(0, 1).ToLowerInvariant()}{ev.Name.Substring(1)}", eventType, FieldAttributes.Private);
+            var field = typeBuilder.DefineField(ToUnderscoreLowerCase(ev.Name), eventType, FieldAttributes.Private);
             var eventInfo = typeBuilder.DefineEvent(ev.Name, EventAttributes.None, eventType);
 
             // adding add method
@@ -176,7 +308,12 @@ namespace jNet.RPC.Client
 
             removeMethodGenerator.Emit(OpCodes.Ret);
             eventInfo.SetRemoveOnMethod(removeMethod);
+            return field;
+        }
 
+        private string ToUnderscoreLowerCase(string name)
+        {
+            return $"_{name.Substring(0, 1).ToLowerInvariant()}{name.Substring(1)}";
         }
 
     }

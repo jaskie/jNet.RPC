@@ -56,10 +56,7 @@ namespace jNet.RPC.UnitTests.Client
 
         }
 
-        protected void OnEventNotification(SocketMessage message)
-        {
-
-        }
+        protected abstract void OnEventNotification(SocketMessage message);
 
         protected T Deserialize<T>(SocketMessage message) where T: new()
         {
@@ -93,6 +90,11 @@ namespace jNet.RPC.UnitTests.Client
             var delegateValue = fieldInfo.GetValue(this) as Delegate;
             if (delegateValue != null)
                 delegateValue.Method.Invoke(delegateValue.Target, new object[] { this, EventArgs.Empty});
+        }
+
+        internal void CallOnEventNotification(string eventName)
+        {
+            OnEventNotification(new SocketMessage((object)null) { MessageType = SocketMessage.SocketMessageType.EventNotification, MemberName = eventName });
         }
 
         
@@ -228,9 +230,12 @@ namespace jNet.RPC.UnitTests.Client
             proxy.SimpleEvent += eventHandler;
             ((ProxyBase)proxy).RaiseEvent(nameof(IBuildedInterface.SimpleEvent));
             Assert.AreEqual(1, i);
+            ((ProxyBase)proxy).CallOnEventNotification(nameof(IBuildedInterface.SimpleEvent));
+            Assert.AreEqual(2, i);
             proxy.SimpleEvent -= eventHandler;
             ((ProxyBase)proxy).RaiseEvent(nameof(IBuildedInterface.SimpleEvent));
-            Assert.AreEqual(1, i);
+            Assert.AreEqual(2, i);
+
         }
 
     }
