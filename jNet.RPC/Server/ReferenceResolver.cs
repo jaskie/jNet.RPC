@@ -11,7 +11,7 @@ namespace jNet.RPC.Server
     internal class ReferenceResolver : IReferenceResolver, IDisposable
     {
         private readonly Dictionary<Guid, ServerObjectBase> _knownDtos = new Dictionary<Guid, ServerObjectBase>();        
-        public static readonly object Sync = new object();
+        public readonly object Sync = new object();
         private int _disposed;
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
@@ -124,7 +124,7 @@ namespace jNet.RPC.Server
                     return false;
                 }
                 _knownDtos.Add(dto.DtoGuid, dto);
-                Logger.Debug("Object ressurection acknowledged {0}", dto.DtoGuid);
+                Logger.Trace("Object ressurection acknowledged {0}", dto.DtoGuid);
             }
             
             return true;

@@ -19,19 +19,21 @@ namespace jNet.RPC.Server
         private readonly Dictionary<DelegateKey, Delegate> _delegates = new Dictionary<DelegateKey, Delegate>();
         private readonly IPrincipal _sessionUser;
         private readonly IDto _initialObject;
+        private readonly ReferenceResolver _referenceResolver;
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
         public ServerSession(TcpClient client, IDto initialObject, IPrincipalProvider principalProvider): base(client, new ReferenceResolver())
         {
             Serializer.SerializationBinder = new SerializationBinder();
-            _initialObject = initialObject;           
+            _initialObject = initialObject;
+            _referenceResolver = ReferenceResolver as ReferenceResolver ?? throw new ApplicationException("Invalid reference resolver");
             if (!(client.Client.RemoteEndPoint is IPEndPoint))
                 throw new UnauthorizedAccessException("Client RemoteEndpoint is invalid");
             _sessionUser = principalProvider.GetPrincipal(client);
             if (_sessionUser == null)
                 throw new UnauthorizedAccessException($"Client {Client.Client.RemoteEndPoint} not allowed");
             Logger.Info("Client {0} from {1} successfully connected", _sessionUser.Identity, Client.Client.RemoteEndPoint);
-            ((ReferenceResolver)ReferenceResolver).ReferencePropertyChanged += ReferenceResolver_ReferencePropertyChanged;
+            _referenceResolver.ReferencePropertyChanged += ReferenceResolver_ReferencePropertyChanged;
             StartThreads();    
         }
 
@@ -64,7 +66,7 @@ namespace jNet.RPC.Server
                 {
                     var message = TakeNextMessage();
                     if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
-                        Logger.Trace("Processing message: {0}:{1}", message.MessageGuid, message.DtoGuid);
+                        Logger.Trace("Processing message: {0}", message);
                     if (message.MessageType == SocketMessage.SocketMessageType.RootQuery)
                         SendResponse(message, _initialObject);
                     else // method of particular object
@@ -72,7 +74,6 @@ namespace jNet.RPC.Server
                         var objectToInvoke = ((ReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
                         if (objectToInvoke != null)
                         {
-                            Debug.WriteLine($"{objectToInvoke}:{message.MemberName}");
                             switch (message.MessageType)
                             {
                                 case SocketMessage.SocketMessageType.Query:
@@ -160,17 +161,17 @@ namespace jNet.RPC.Server
                                     SendResponse(message, null);
                                     break;
                                 case SocketMessage.SocketMessageType.ProxyFinalized:
-                                    ((ReferenceResolver)ReferenceResolver).RemoveReference(objectToInvoke);
+                                    _referenceResolver.RemoveReference(objectToInvoke);
                                     SendResponse(message, null);
                                     break;
                                 case SocketMessage.SocketMessageType.ProxyResurrected:
-                                    ((ReferenceResolver)ReferenceResolver).RestoreReference(objectToInvoke);
+                                    _referenceResolver.RestoreReference(objectToInvoke);
                                     break;
                             }
                         }
                         else
                         {
-                            Logger.Debug("Dto send by client not found! {0}", message.DtoGuid);
+                            Logger.Warn("Dto send by client not found, message {0}", message);
                             SendResponse(message, null);
                         }
                     }
@@ -196,19 +197,19 @@ namespace jNet.RPC.Server
         protected override void OnDispose()
         {
             base.OnDispose();
-            ((ReferenceResolver)ReferenceResolver).ReferencePropertyChanged -= ReferenceResolver_ReferencePropertyChanged;
+            _referenceResolver.ReferencePropertyChanged -= ReferenceResolver_ReferencePropertyChanged;
             lock (((IDictionary) _delegates).SyncRoot)
             {
                 foreach (var d in _delegates.Keys.ToArray())
                 {
-                    var havingDelegate = ((ReferenceResolver)ReferenceResolver).ResolveReference(d.DtoGuid);
+                    var havingDelegate = _referenceResolver.ResolveReference(d.DtoGuid);
                     if (havingDelegate == null)
                         throw new ApplicationException("Referenced object not found");
                     var ei = havingDelegate.GetType().GetEvent(d.EventName);
                     RemoveDelegate(havingDelegate, ei);
                 }
             }
-            ((ReferenceResolver)ReferenceResolver).Dispose();
+            _referenceResolver.Dispose();
         }
 
         private void SendResponse(SocketMessage message, object response)

@@ -2,24 +2,28 @@
 using System.Collections.Concurrent;
 using System.IO;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace jNet.RPC.Client
 {
     public abstract class ClientSession : SocketConnection
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();       
-        private readonly ConcurrentDictionary<Guid, MessageRequest> _requests = new ConcurrentDictionary<Guid, MessageRequest>();        
+        private readonly ConcurrentDictionary<Guid, MessageRequest> _requests = new ConcurrentDictionary<Guid, MessageRequest>();
+        private readonly ReferenceResolver _referenceResolver;
 
         public ClientSession() : base(new ReferenceResolver())
         {
-            ((ReferenceResolver)ReferenceResolver).ReferenceFinalized += Resolver_ReferenceFinalized;                     
+            _referenceResolver = ReferenceResolver as ReferenceResolver ?? throw new ApplicationException("Invalid reference resolver");
+            _referenceResolver.ReferenceFinalized += Resolver_ReferenceFinalized;
+            _referenceResolver.ReferenceResurected += Resolver_ReferenceResurrected;
         }        
 
         protected override void OnDispose()
         {
-            ((ReferenceResolver)ReferenceResolver).Dispose();
             base.OnDispose();
+            _referenceResolver.ReferenceFinalized -= Resolver_ReferenceFinalized;
+            _referenceResolver.ReferenceResurected -= Resolver_ReferenceResurrected;
+            _referenceResolver.Dispose();
         }
 
         private void Resolver_ReferenceFinalized(object sender, ProxyObjectBaseEventArgs e)
@@ -31,6 +35,7 @@ namespace jNet.RPC.Client
                 0,
                 null));            
         }
+
         private void Resolver_ReferenceResurrected(object sender, ProxyObjectBaseEventArgs e)
         {
             Send(SocketMessage.Create(
@@ -53,7 +58,7 @@ namespace jNet.RPC.Client
 
                     if (!_requests.TryRemove(query.MessageGuid, out var _))
                     {
-                        Logger.Warn("SendAndGetResponse client trapped {0}:{1}", response.MessageGuid, response.MessageType);
+                        Logger.Warn("SendAndGetResponse client trapped for message {0}", response);
                         return default;
                     }
 
@@ -77,29 +82,27 @@ namespace jNet.RPC.Client
                 {
                     var message = TakeNextMessage();
                     if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
-                        Logger.Trace("Processing message: {0}:{1}:{2}:{3}", message.MessageGuid, message.DtoGuid, message.MemberName, message.ValueString);
+                        Logger.Trace("Processing message: {0}", message);
 
                     switch (message.MessageType)
                     {
                         case SocketMessage.SocketMessageType.ProxyFinalized:
-                            ((ReferenceResolver)ReferenceResolver).DeleteReference(message.DtoGuid);
+                            _referenceResolver.DeleteReference(message.DtoGuid);
                             break;
 
                         case SocketMessage.SocketMessageType.EventNotification:
-                            var notifyObject = ((ReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
+                            var notifyObject = _referenceResolver.ResolveReference(message.DtoGuid);
                             if (notifyObject == null)
-                                Logger.Warn("NotifyObject null: {0}:{1}", message.MessageGuid, message.DtoGuid);
+                                Logger.Debug("Proxy to notify not found for message: {0}", message);
                             else
-                                Task.Run(() => notifyObject?.OnNotificationMessage(message)); //to not block calling thread
+                                notifyObject?.OnNotificationMessage(message);
                             break;
 
                         default:
-                            if (!_requests.TryGetValue(message.MessageGuid, out var request))
-                            {
-                                Logger.Warn("Message consumer not found");
-                                break;
-                            }
-                            request.SetResult(message);
+                            if (_requests.TryGetValue(message.MessageGuid, out var request))
+                                request.SetResult(message);
+                            else
+                                Logger.Warn("Unexpected message arrived from server: {0}", message);
                             break;
                     }
                 }
@@ -139,16 +142,6 @@ namespace jNet.RPC.Client
                             Logger.Error(ex, "Error when populating {0}:{1}", source.DtoGuid, target.DtoGuid);
                         }
                     }
-
-#if DEBUG
-                    // TODO: remove
-                    if (obj == null && message.MemberName.Contains("GetSucc"))
-                    {
-                        valueStream.Position = 0;
-                        Logger.Debug("NULL ON DESERIALIZE! {0}:{1}:{2}", message.DtoGuid, message.ValueString, reader.ReadToEnd());
-                    }
-#endif                        
-
                     return obj;                    
                 }
                     

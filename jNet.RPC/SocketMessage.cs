@@ -87,7 +87,7 @@ namespace jNet.RPC
 
         public override string ToString()
         {
-            return $"WebSocketMessage: {MessageType}:{MemberName}";
+            return $"{MessageGuid}:{MessageType}:{MemberName} for {DtoGuid}";
         }
         
         public static SocketMessage Create(SocketMessageType SocketMessageType, IDto dto, string memberName, int paramsCount, object value)

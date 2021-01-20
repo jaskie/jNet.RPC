@@ -105,12 +105,12 @@ namespace jNet.RPC
                     : SerializeDto(message.Value);
                 if (!_sendQueue.TryAdd(message.Encode(serializedData)))
                 {
-                    Logger.Error("Message queue overflow");
+                    Logger.Error("Message queue overflow with message {0}", message);
                     NotifyDisconnection();
                     return;
                 }
                 if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
-                    Logger.Trace("Message queued to send {0}:{1}:{2}", message.MessageGuid, message.DtoGuid, message.MessageType);
+                    Logger.Trace("Message queued to send: {0}", message);
             }
             catch (Exception e)
             {
@@ -214,7 +214,7 @@ namespace jNet.RPC
                             continue;
                         var message = new SocketMessage(dataBuffer);
                         if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
-                            Logger.Debug("Message received {0}:{1}", message.MessageGuid, message.MessageType);
+                            Logger.Trace("Message received: {0}", message);
                         _receiveQueue.Add(message);
                         dataBuffer = null;                                               
                     }

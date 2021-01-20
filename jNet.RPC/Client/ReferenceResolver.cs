@@ -9,6 +9,8 @@ namespace jNet.RPC.Client
     {
         private readonly Dictionary<Guid, WeakReference<ProxyObjectBase>> _knownDtos = new Dictionary<Guid, WeakReference<ProxyObjectBase>>();
         private readonly Dictionary<Guid, ProxyObjectBase> _proxiesToPopulate = new Dictionary<Guid, ProxyObjectBase>();
+        private readonly Dictionary<Guid, ProxyObjectBase> _finalizeRequested = new Dictionary<Guid, ProxyObjectBase>();
+
         private int _disposed;
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         
@@ -17,7 +19,6 @@ namespace jNet.RPC.Client
         {
             if (Interlocked.Exchange(ref _disposed, 1) != default)
                 return;
-
             _knownDtos.Clear();
         }
 
@@ -34,7 +35,6 @@ namespace jNet.RPC.Client
                 {
                     _knownDtos.Add(id, new WeakReference<ProxyObjectBase>(proxy, true));
                     proxy.Finalized += Proxy_Finalized;
-                    proxy.Resurrected += Proxy_Resurrected;
                     Logger.Trace("AddReference {0} for {1}", reference, value);                    
                 }
                 else
@@ -72,17 +72,16 @@ namespace jNet.RPC.Client
                     if (!value.TryGetTarget(out var target))
                     {
                         Logger.Debug("Could not get target {0}", id);
-                        if (ProxyObjectBase.TryResurect(id, out target))
+                        if (TryResurect(id, out target))
                             return target;
                     }
-                    Logger.Trace("Resolved reference {0} with {1}", reference, value);
-
                     if (target == null)
-                        Logger.Debug("NULL ON TARGET! {0}", reference);
-
+                        Logger.Warn("Proxy reference {0} target is null", reference);
+                    else
+                        Logger.Trace("Resolved reference {0} with {1}", reference, target);
                     return target;
                 }
-                else if (ProxyObjectBase.TryResurect(id, out var target))
+                else if (TryResurect(id, out var target))
                     return target;
                 else
                 {
@@ -95,6 +94,7 @@ namespace jNet.RPC.Client
         #endregion //IReferenceResolver
 
         internal event EventHandler<ProxyObjectBaseEventArgs> ReferenceFinalized;
+        internal event EventHandler<ProxyObjectBaseEventArgs> ReferenceResurected;
 
         internal ProxyObjectBase ResolveReference(Guid reference)
         {
@@ -102,7 +102,6 @@ namespace jNet.RPC.Client
             {
                 if (_knownDtos.TryGetValue(reference, out var p) && p.TryGetTarget(out var target))
                     return target;
-
                 return null;
             }                     
         }
@@ -119,42 +118,47 @@ namespace jNet.RPC.Client
 
         public void DeleteReference(Guid reference)
         {
-            if (ProxyObjectBase.TryGetFinalizeRequested(reference, out var proxy))
+            lock (((IDictionary)_finalizeRequested).SyncRoot)
             {
-                proxy.Finalized -= Proxy_Finalized;
-                proxy.Resurrected -= Proxy_Resurrected;
-                proxy.FinalizeProxy();
-                return;
+                if (_finalizeRequested.TryGetValue(reference, out var proxy))
+                {
+                    _finalizeRequested.Remove(reference);
+                    proxy.Finalized -= Proxy_Finalized;
+                    return;
+                }
             }
-            Logger.Debug("Could not finalize resurrected proxy {0}", reference);
+            Logger.Debug("Could not finalize proxy {0}, probably resurected", reference);
         }
 
-        private void Proxy_Resurrected(object sender, EventArgs e)
+        private bool TryResurect(Guid dtoGuid, out ProxyObjectBase proxy)
         {
-            if (!(sender is ProxyObjectBase proxy))
-                return;
-
-            try
+            lock (((IDictionary)_finalizeRequested).SyncRoot)
             {
-                lock (((IDictionary)_knownDtos).SyncRoot)
-                {
-                    _knownDtos.Add(proxy.DtoGuid, new WeakReference<ProxyObjectBase>(proxy, true));
-                }                
+                if (!_finalizeRequested.TryGetValue(dtoGuid, out proxy))
+                    return false;
+                _finalizeRequested.Remove(dtoGuid);
             }
-            catch
-            {
-                Logger.Warn("Could not restore to knownDto list {0}", proxy.DtoGuid);
-            }
-                
-
-            Logger.Debug("Proxy resurrected {0}", proxy.DtoGuid);
+            lock (((IDictionary)_knownDtos).SyncRoot)
+                _knownDtos.Add(proxy.DtoGuid, new WeakReference<ProxyObjectBase>(proxy, true));
+            ReferenceResurected?.Invoke(this, new ProxyObjectBaseEventArgs(proxy));
+            proxy.Resurect();
+            return true;
         }
 
         private void Proxy_Finalized(object sender, EventArgs e)
         {            
             if (!(sender is ProxyObjectBase proxy))
                 return;
-
+            lock (((IDictionary)_finalizeRequested).SyncRoot)
+            {
+                if (_finalizeRequested.ContainsKey(proxy.DtoGuid))
+                    Logger.Warn("Could not save proxy {0}", proxy.DtoGuid);
+                else
+                {
+                    _finalizeRequested[proxy.DtoGuid] = proxy;
+                    Logger.Trace("Saved proxy {0}", proxy.DtoGuid);
+                }
+            }
             lock (((IDictionary)_knownDtos).SyncRoot)
             {
                 Logger.Trace("Deleting from knowndtos {0}", proxy.DtoGuid);
