@@ -34,7 +34,7 @@ namespace jNet.RPC.Client
             }
             catch (Exception e)
             {
-                Logger.Error(e, $"From {nameof(GetRootObject)}:");
+                Logger.Error(e, $"From {nameof(GetRootObject)}:{typeof(T)}");
                 throw;
             }
         }
@@ -53,7 +53,7 @@ namespace jNet.RPC.Client
             }
             catch (Exception e)
             {
-                Logger.Error(e, "From Query for {0}.{1}", dto, methodName);
+                Logger.Error(e, "From Query {0}:{1}", dto, methodName);
                 throw;
             }
         }
@@ -73,7 +73,7 @@ namespace jNet.RPC.Client
             }
             catch (Exception e)
             {
-                Logger.Error(e, "From Get {0}.{1}", dto, propertyName);
+                Logger.Error(e, "From Get {0}:{1}", dto, propertyName);
                 throw;
             }
         }
@@ -92,7 +92,7 @@ namespace jNet.RPC.Client
             }
             catch (Exception e)
             {
-                Logger.Error(e, "From Invoke {0}.{1}", dto, methodName);
+                Logger.Error(e, "From Invoke {0}:{1}", dto, methodName);
                 throw;
             }
         }
@@ -111,7 +111,7 @@ namespace jNet.RPC.Client
             }
             catch (Exception e)
             {
-                Logger.Error(e, "From Set {0}.{1}", dto, propertyName);
+                Logger.Error(e, "From Set {0}:{1}", dto, propertyName);
                 throw;
             }
         }
@@ -130,7 +130,7 @@ namespace jNet.RPC.Client
             }
             catch (Exception e)
             {
-                Logger.Error(e, "From EventAdd {0}.{1}", dto, eventName);
+                Logger.Error(e, "From EventAdd {0}:{1}", dto, eventName);
                 throw;
             }
         }
@@ -149,7 +149,7 @@ namespace jNet.RPC.Client
             }
             catch (Exception e)
             {
-                Logger.Error(e, "From EventRemove: {0}.{1}", dto, eventName);
+                Logger.Error(e, "From EventRemove: {0}:{1}", dto, eventName);
                 throw;
             }
         }        

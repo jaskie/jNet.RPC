@@ -10,6 +10,7 @@ namespace jNet.RPC.Client
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();       
         private readonly ConcurrentDictionary<Guid, MessageRequest> _requests = new ConcurrentDictionary<Guid, MessageRequest>();
         private readonly ReferenceResolver _referenceResolver;
+        private readonly NotificationExecutor _notificationExecutor = new NotificationExecutor();
 
         public ClientSession() : base(new ReferenceResolver())
         {
@@ -24,6 +25,7 @@ namespace jNet.RPC.Client
             _referenceResolver.ReferenceFinalized -= Resolver_ReferenceFinalized;
             _referenceResolver.ReferenceResurected -= Resolver_ReferenceResurrected;
             _referenceResolver.Dispose();
+            _notificationExecutor.Dispose();
         }
 
         private void Resolver_ReferenceFinalized(object sender, ProxyObjectBaseEventArgs e)
@@ -95,7 +97,7 @@ namespace jNet.RPC.Client
                             if (notifyObject == null)
                                 Logger.Debug("Proxy to notify not found for message: {0}", message);
                             else
-                                notifyObject?.OnNotificationMessage(message);
+                                _notificationExecutor.Queue(() => notifyObject.OnNotificationMessage(message));
                             break;
 
                         default:
