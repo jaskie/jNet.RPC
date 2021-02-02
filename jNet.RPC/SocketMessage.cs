@@ -17,6 +17,7 @@ namespace jNet.RPC
             EventNotification,
             ProxyFinalized,       
             ProxyResurrected,
+            ProxyMissing,
             Exception,            
         }
 
@@ -31,7 +32,7 @@ namespace jNet.RPC
         private readonly byte[] _rawData;
         private readonly int _valueStartIndex;
 
-        internal SocketMessage(object value)
+        internal SocketMessage(object value = null)
         {
             MessageGuid = Guid.NewGuid();
             Value = value;

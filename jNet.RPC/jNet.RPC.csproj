@@ -75,6 +75,7 @@
     <Compile Include="IRemoteHostConfig.cs" />
     <Compile Include="PropertyChangedWithValueEventArgs.cs" />
     <Compile Include="SerializationContractResolver.cs" />
+    <Compile Include="Server\DelegateKey.cs" />
     <Compile Include="Server\SerializationBinder.cs" />
     <Compile Include="Server\IPrincipalProvider.cs" />
     <Compile Include="Server\PrincipalProvider.cs" />

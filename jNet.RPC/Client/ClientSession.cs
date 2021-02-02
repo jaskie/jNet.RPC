@@ -17,13 +17,16 @@ namespace jNet.RPC.Client
             _referenceResolver = ReferenceResolver as ReferenceResolver ?? throw new ApplicationException("Invalid reference resolver");
             _referenceResolver.ReferenceFinalized += Resolver_ReferenceFinalized;
             _referenceResolver.ReferenceResurected += Resolver_ReferenceResurrected;
-        }        
+            _referenceResolver.OnReferenceMissing = Resolver_ReferenceMissing;
+        }
+
 
         protected override void OnDispose()
         {
             base.OnDispose();
             _referenceResolver.ReferenceFinalized -= Resolver_ReferenceFinalized;
             _referenceResolver.ReferenceResurected -= Resolver_ReferenceResurrected;
+            _referenceResolver.OnReferenceMissing = null;
             _referenceResolver.Dispose();
             _notificationExecutor.Dispose();
         }
@@ -47,6 +50,21 @@ namespace jNet.RPC.Client
                 0,
                 null));
         }
+
+        private IDto Resolver_ReferenceMissing(Guid reference)
+        {
+            var dto = SendAndGetResponse<IDto>(new SocketMessage()
+            {
+                MessageType = SocketMessage.SocketMessageType.ProxyMissing,
+                DtoGuid = reference
+            });
+            if (dto == null)
+                Logger.Warn("Dto {0} not found on server", reference);
+            else
+                Logger.Debug("Dto {0} restored from server as {1}", reference, dto);
+            return dto;
+        }
+
 
         internal T SendAndGetResponse<T>(SocketMessage query)
         {

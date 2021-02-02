@@ -130,6 +130,24 @@ namespace jNet.RPC.Server
             return true;
         }
 
+        internal IDto FindMissingProxy(Guid dtoGuid)
+        {
+            lock (Sync)
+            {
+                if (_knownDtos.TryGetValue(dtoGuid, out var dto))
+                    return dto;
+                dto = ServerObjectBase.FindDto(dtoGuid);
+                if (dto == null)
+                {
+                    Logger.Warn("Could not restore Dto (null on server side)! {0}", dto.DtoGuid);
+                    return null;
+                }
+                _knownDtos[dtoGuid] = dto;
+                return dto;
+            }
+        }
+
+
         internal event EventHandler<WrappedEventArgs> ReferencePropertyChanged;
 
         private void Dto_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -140,15 +158,15 @@ namespace jNet.RPC.Server
         }
 
 
-        public void RemoveReference(IDto dto)
+        public void RemoveReference(Guid dtoGuid)
         {
             lock(Sync)
             {
-                if (!_knownDtos.TryGetValue(dto.DtoGuid, out var removed))
+                if (!_knownDtos.TryGetValue(dtoGuid, out var removed))
                     return;
 
                 removed.PropertyChanged -= Dto_PropertyChanged;
-                _knownDtos.Remove(dto.DtoGuid);
+                _knownDtos.Remove(dtoGuid);
             }                            
         }
     }
