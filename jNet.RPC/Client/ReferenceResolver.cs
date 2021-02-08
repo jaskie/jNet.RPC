@@ -40,7 +40,7 @@ namespace jNet.RPC.Client
                 else
                 {
                     _proxiesToPopulate[proxy.DtoGuid] = proxy;
-                    Logger.Debug("AddReference already in knownDtos, will populate {0}", proxy);
+                    Logger.Debug("AddReference already in knownDtos, will populate {0}", proxy.GetType());
                 }                    
             }            
         }        

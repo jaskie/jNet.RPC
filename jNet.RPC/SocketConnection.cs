@@ -20,6 +20,7 @@ namespace jNet.RPC
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private int _disposed;
+        private int _isConnected;
         private readonly BlockingCollection<byte[]> _sendQueue;
         private readonly BlockingCollection<SocketMessage> _receiveQueue = new BlockingCollection<SocketMessage>(new ConcurrentQueue<SocketMessage>());
 
@@ -81,8 +82,9 @@ namespace jNet.RPC
 
             try
             {
+                Logger.Info("Connecting to {0}:{1}", addressParts[0], port);
                 await Client.ConnectAsync(addressParts[0], port).ConfigureAwait(false);
-                Logger.Info("Connection opened to {0}:{1}.", addressParts[0], port);
+                Logger.Info("Connected to {0}:{1}", addressParts[0], port);
                 StartThreads();
                 return true;
             }
@@ -96,7 +98,7 @@ namespace jNet.RPC
 
         internal void Send(SocketMessage message)
         {
-            if (!IsConnected)
+            if (_isConnected != default)
                 return;
             try
             {
@@ -118,8 +120,6 @@ namespace jNet.RPC
                 NotifyDisconnection();
             }
         }
-
-        public bool IsConnected { get; private set; } = true;
         
         protected virtual void OnDispose()
         {
@@ -131,8 +131,6 @@ namespace jNet.RPC
             _sendQueue.Dispose();
             _receiveQueue.Dispose();
             CancellationTokenSource.Dispose();
-            IsConnected = false;
-            Logger.Info("Connection closed.");
         }
 
         public void Dispose()
@@ -239,9 +237,9 @@ namespace jNet.RPC
 
         protected void NotifyDisconnection()
         {
-            if (!IsConnected)
+            if (Interlocked.Exchange(ref _isConnected, 1) != default)
                 return;
-            IsConnected = false;
+            Logger.Info("Disconnected");
             Task.Run(() => Disconnected?.Invoke(this, EventArgs.Empty));  //move the notifier out of calling  thread
         }
 

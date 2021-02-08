@@ -137,7 +137,7 @@ namespace jNet.RPC.Client
             }
         }
 
-        private T Deserialize<T>(SocketMessage message)
+        internal T Deserialize<T>(SocketMessage message)
         {
             using (var valueStream = message.ValueStream)
             {

@@ -132,13 +132,7 @@ namespace jNet.RPC.Client
         {
             if (_client == null)
                 return default;
-            using (var valueStream = message.ValueStream)
-            {
-                if (valueStream == null)
-                    return default;
-                using (var reader = new StreamReader(valueStream))
-                    return (T) _client.Serializer.Deserialize(reader, typeof(T));
-            }
+            return _client.Deserialize<T>(message);
         }
 
         internal void OnNotificationMessage(SocketMessage message)
