@@ -1,6 +1,4 @@
-﻿//#undef DEBUG
-
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -234,9 +232,9 @@ namespace jNet.RPC.Server
                 if (_delegates.ContainsKey(signature))
                     return;
                 var delegateToInvoke = ConvertDelegate((Action<object, EventArgs>) delegate(object o, EventArgs ea) { NotifyClient(objectToInvoke, ea, ei.Name); }, ei.EventHandlerType);
-                Debug.WriteLine($"Server: added delegate {signature} on {objectToInvoke}");
                 _delegates[signature] = delegateToInvoke;
                 ei.AddEventHandler(objectToInvoke, delegateToInvoke);
+                Logger.Trace("Server: added delegate {0} on {1}", signature, objectToInvoke);
             }
         }
 
@@ -249,7 +247,7 @@ namespace jNet.RPC.Server
                 if (!_delegates.Remove(signature))
                     return;
                 ei.RemoveEventHandler(objectToInvoke, delegateToRemove);
-                Debug.WriteLine($"Server: removed delegate {signature} on {objectToInvoke}");
+                Logger.Trace("Server: removed delegate {0} on {1}", signature, objectToInvoke);
             }
         }
 
@@ -276,10 +274,7 @@ namespace jNet.RPC.Server
                     else
                     {
                         value = new PropertyChangedWithValueEventArgs(propertyChangedEventArgs.PropertyName, null);
-                        Debug.WriteLine(dto,
-                            $"{GetType()}: Couldn't get value of {propertyChangedEventArgs.PropertyName}");
                     }
-                    Debug.WriteLine($"Server: PropertyChanged {propertyChangedEventArgs.PropertyName} on {dto} sent");
                     Send(new SocketMessage(value)
                     {
                         MessageType = SocketMessage.SocketMessageType.EventNotification,
