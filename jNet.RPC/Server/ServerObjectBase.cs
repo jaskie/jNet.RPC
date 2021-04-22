@@ -25,12 +25,11 @@ namespace jNet.RPC.Server
 
         protected ServerObjectBase()
         {
-            DtoGuid = Guid.NewGuid();
             AllDtos.TryAdd(DtoGuid, new WeakReference<ServerObjectBase>(this));
         }
 
         [XmlIgnore]
-        public Guid DtoGuid { get; }
+        public Guid DtoGuid { get; } = Guid.NewGuid();
 
         private int _disposed;
 
