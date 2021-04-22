@@ -50,14 +50,11 @@ namespace jNet.RPC.Server
 
         public event PropertyChangedEventHandler PropertyChanged;
 
-        public event EventHandler Disposed;
-
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _disposed, 1) != default)
                 return;
             DoDispose();
-            Disposed?.Invoke(this, EventArgs.Empty);
         }
 
         protected bool IsDisposed => _disposed != default;

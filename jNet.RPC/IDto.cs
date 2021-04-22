@@ -6,6 +6,5 @@ namespace jNet.RPC
     public interface IDto: INotifyPropertyChanged, IDisposable
     {
         Guid DtoGuid { get; }
-        event EventHandler Disposed;
     }
 }

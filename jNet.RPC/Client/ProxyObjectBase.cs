@@ -48,7 +48,6 @@ namespace jNet.RPC.Client
         public Guid DtoGuid { get; internal set; }        
 
         public event PropertyChangedEventHandler PropertyChanged;
-        public event EventHandler Disposed;
        
         internal event EventHandler Finalized;        
 
@@ -119,7 +118,6 @@ namespace jNet.RPC.Client
         protected virtual void DoDispose()
         {
             _client = null;
-            Disposed?.Invoke(this, EventArgs.Empty);
         }
 
         [OnDeserialized]
