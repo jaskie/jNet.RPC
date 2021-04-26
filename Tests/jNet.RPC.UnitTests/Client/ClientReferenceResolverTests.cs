@@ -109,35 +109,6 @@ namespace jNet.RPC.UnitTests.Client
         }
 
         [TestMethod]
-        public void ResolveReference_ReferenceResurrected_ReturnObject()
-        {           
-            WeakReference<ProxyObjectBase> weakReference = null;
-            Guid guid = Guid.Empty;
-
-            new Action(() =>
-            {
-                var mockObject = new MockProxyObject { DtoGuid = Guid.NewGuid() };
-                weakReference = new WeakReference<ProxyObjectBase>(mockObject, true);
-                _knownDtos.Add(mockObject.DtoGuid, new WeakReference<ProxyObjectBase>(mockObject));
-                guid = new Guid(mockObject.DtoGuid.ToString());
-            })();
-
-            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true);
-            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true);
-            GC.WaitForPendingFinalizers();
-
-            if (ProxyObjectBase.FinalizeRequested.Count < 1)
-                Assert.Fail("Object did not finalize or finalized instantly");
-
-            new Action(() =>
-            {
-                weakReference.TryGetTarget(out var target);            
-                var proxy = _clientReferenceResolver.ResolveReference(this, target.DtoGuid.ToString());
-                Assert.AreEqual(target, proxy, "Proxy did not resurrected properly");
-            })();            
-        }
-        
-        [TestMethod]
         public void ResolveReference_NonReferenced_ReturnNull()
         {            
             var proxy = _clientReferenceResolver.ResolveReference(this, _mockObject.DtoGuid.ToString());

@@ -9,14 +9,13 @@ namespace jNet.RPC.UnitTests.Client
     public class ProxyObjectBaseTest
     {
         private MockProxyObject _mockProxy;
-        private PrivateObject _mockBase;
         
         [TestInitialize]
         public void Initialize()
         {
             _mockProxy = new MockProxyObject { DtoGuid = Guid.NewGuid() };
-            _mockBase = new PrivateObject(_mockProxy, new PrivateType(typeof(ProxyObjectBase)));
         }
+
         [TestMethod]
         public void FinalizerTest()
         {
@@ -36,11 +35,7 @@ namespace jNet.RPC.UnitTests.Client
             {
                 weakRefernce.TryGetTarget(out var target);
                 var priv = new PrivateObject(target, new PrivateType(typeof(ProxyObjectBase)));
-
-                Assert.IsTrue(ProxyObjectBase.FinalizeRequested.ContainsKey(target.DtoGuid), "Object did not save itself!");            
                 Assert.IsFalse((int)priv.GetField("_isFinalizeRequested") == default, "Object not prepared for collection!");
-
-                ProxyObjectBase.FinalizeRequested.TryRemove(target.DtoGuid, out _);
             })();
 
             GC.Collect(); //first collect (mark as finalized)
@@ -48,36 +43,8 @@ namespace jNet.RPC.UnitTests.Client
             GC.Collect(); //second collect (collection)
             GC.WaitForPendingFinalizers();
 
-            Assert.IsFalse(ProxyObjectBase.FinalizeRequested.ContainsKey(checkGuid), "Object did not collect...");
             Assert.IsFalse(weakRefernce.TryGetTarget(out _), "Object is still alive...");
         }
 
-        [TestMethod]
-        public void FinalizeProxy_Void()
-        {
-            if (!ProxyObjectBase.FinalizeRequested.TryAdd(_mockProxy.DtoGuid, _mockProxy))
-                Assert.Fail("Could not add object to Finalize Requests");
-            
-            _mockProxy.FinalizeProxy();
-            Assert.IsFalse(ProxyObjectBase.FinalizeRequested.ContainsKey(_mockProxy.DtoGuid), "FinalizeRequests should not contain this element!");
-            Assert.IsTrue((int)_mockBase.GetField("_isFinalizeRequested") == default); 
-        }
-
-        [TestMethod]
-        public void ResurrectTest_Void()
-        {
-            bool resurrectedInvoked = false;
-
-            if (!ProxyObjectBase.FinalizeRequested.TryAdd(_mockProxy.DtoGuid, _mockProxy))
-                Assert.Fail("Could not add object to Finalize Requests");
-            
-            _mockProxy.Resurrected += (s, e) => { resurrectedInvoked = true; };
-            _mockProxy.Resurrect();
-
-            Assert.IsTrue(resurrectedInvoked, "Object did not notified about resurrection!");
-            Assert.IsFalse(ProxyObjectBase.FinalizeRequested.ContainsKey(_mockProxy.DtoGuid), "Object shouldn't be here after resurrection!");
-
-        }
-        
     }
 }

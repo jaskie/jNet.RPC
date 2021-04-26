@@ -52,7 +52,6 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Client\ClientObjectBaseTests.cs" />
     <Compile Include="Communication\CommunicationTests.cs" />
     <Compile Include="Communication\ResolvingProxyTypeTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
