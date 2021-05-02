@@ -17,6 +17,7 @@ namespace jNet.RPC.UnitTests.Client
         int OneParamIntMethod(int i);
         int TwoParamsIntMethod(int i1, int i2);
         event EventHandler SimpleEvent;
+        event EventHandler<TestEventArgs> GenericEvent;
     }
 
     public class PropertyNotFoundException : Exception
@@ -58,9 +59,9 @@ namespace jNet.RPC.UnitTests.Client
 
         protected abstract void OnEventNotification(SocketMessage message);
 
-        protected T Deserialize<T>(SocketMessage message) where T: new()
+        protected T Deserialize<T>(SocketMessage message)
         {
-            return new T();
+            return (T)message.Value;
         }
 
         internal T GetPropertyValue<T>(string propertyName)
@@ -83,22 +84,27 @@ namespace jNet.RPC.UnitTests.Client
             return _methodInvocationParameters[methodName];
         }
 
-        internal void RaiseEvent(string eventName)
+        internal void RaiseEvent(string eventName, EventArgs args)
         {
             var fieldName = $"_{eventName.Substring(0, 1).ToLowerInvariant()}{eventName.Substring(1)}";
             var fieldInfo = GetType().GetField(fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             var delegateValue = fieldInfo.GetValue(this) as Delegate;
             if (delegateValue != null)
-                delegateValue.Method.Invoke(delegateValue.Target, new object[] { this, EventArgs.Empty});
+                delegateValue.Method.Invoke(delegateValue.Target, new object[] { this, args});
         }
 
-        internal void CallOnEventNotification(string eventName)
+        internal void CallOnEventNotification(string eventName, object eventArgs)
         {
-            OnEventNotification(new SocketMessage((object)null) { MessageType = SocketMessage.SocketMessageType.EventNotification, MemberName = eventName });
-        }
-
-        
+            OnEventNotification(new SocketMessage(eventArgs) { MessageType = SocketMessage.SocketMessageType.EventNotification, MemberName = eventName });
+        }        
     }
+
+
+    public class TestEventArgs : EventArgs
+    {
+        public int IntValue { get; set; }
+    }
+
 
     [TestClass]
     public class ProxyBuilderTests
@@ -228,14 +234,33 @@ namespace jNet.RPC.UnitTests.Client
                 i++;
             });
             proxy.SimpleEvent += eventHandler;
-            ((ProxyBase)proxy).RaiseEvent(nameof(IBuildedInterface.SimpleEvent));
+            ((ProxyBase)proxy).RaiseEvent(nameof(IBuildedInterface.SimpleEvent), EventArgs.Empty);
             Assert.AreEqual(1, i);
-            ((ProxyBase)proxy).CallOnEventNotification(nameof(IBuildedInterface.SimpleEvent));
+            ((ProxyBase)proxy).CallOnEventNotification(nameof(IBuildedInterface.SimpleEvent), null);
             Assert.AreEqual(2, i);
             proxy.SimpleEvent -= eventHandler;
-            ((ProxyBase)proxy).RaiseEvent(nameof(IBuildedInterface.SimpleEvent));
+            ((ProxyBase)proxy).RaiseEvent(nameof(IBuildedInterface.SimpleEvent), EventArgs.Empty);
             Assert.AreEqual(2, i);
-
+        }
+        
+        [TestMethod]
+        public void GenericEventInvokation()
+        {
+            var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
+            var args = new TestEventArgs { IntValue = 3243423 };
+            int i = 0;
+            EventHandler<TestEventArgs> eventHandler = new EventHandler<TestEventArgs>((s, e) =>
+            {
+                i += e.IntValue;
+            });
+            proxy.GenericEvent += eventHandler;
+            ((ProxyBase)proxy).RaiseEvent(nameof(IBuildedInterface.GenericEvent), args);
+            Assert.AreEqual(1 * args.IntValue, i);
+            ((ProxyBase)proxy).CallOnEventNotification(nameof(IBuildedInterface.GenericEvent), args);
+            Assert.AreEqual(2 * args.IntValue, i);
+            proxy.GenericEvent -= eventHandler;
+            ((ProxyBase)proxy).RaiseEvent(nameof(IBuildedInterface.GenericEvent), args);
+            Assert.AreEqual(2 * args.IntValue, i);
         }
 
     }
