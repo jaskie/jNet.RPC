@@ -13,6 +13,11 @@ namespace ServerApp
         private string _name = "A root element name property";
         private readonly object _sync = new(); //required as request may come from many client threads
 
+        public RootElement()
+        {
+            _childElements.Add(new ChildElement { Value = 50 });
+        }
+
         [DtoMember]
         public string Name { get => _name; set => SetField(ref _name, value); }
 

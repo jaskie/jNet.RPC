@@ -11,12 +11,6 @@
         <vm:MainWindowViewModel/>
     </Window.DataContext>
     <Grid>
-        <Grid Visibility="{Binding IsConnecting, Converter={StaticResource booleanToVisibilityConverter}}">
-            <Border Background="Black" Opacity="0.3"/>
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock FontSize="26">Connecting...</TextBlock>
-            </StackPanel>
-        </Grid>
         <ContentControl Content="{Binding RootElement}">
             <ContentControl.Resources>
                 <DataTemplate DataType="{x:Type vm:RootElementViewModel}">
@@ -24,5 +18,11 @@
                 </DataTemplate>
             </ContentControl.Resources>
         </ContentControl>
+        <Grid Visibility="{Binding IsConnecting, Converter={StaticResource booleanToVisibilityConverter}}">
+            <Border Background="Black" Opacity="0.3"/>
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock FontSize="26">Connecting...</TextBlock>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>

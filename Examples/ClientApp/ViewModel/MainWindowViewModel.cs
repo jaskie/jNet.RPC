@@ -76,7 +76,8 @@ namespace ClientApp.ViewModel
             IsConnecting = true;
             _remoteClient = new RemoteClient();
             _remoteClient.Disconnected += RemoteClient_Disconnected;
-            await _remoteClient.ConnectAsync(address);
+            if (!await _remoteClient.ConnectAsync(address))
+                return;
             var root = _remoteClient.GetRootObject<IRootElement>();
             RootElement = new RootElementViewModel(root);
             IsConnecting = false;

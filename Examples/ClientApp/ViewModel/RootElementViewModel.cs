@@ -5,7 +5,9 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
+using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace ClientApp.ViewModel
 {
@@ -53,26 +55,29 @@ namespace ClientApp.ViewModel
 
         private void AddChild(object _)
         {
-            var child = Root.AddChild();
-            var vm = ChildElements.FirstOrDefault(c => c.ChildElement == child);
-            SelectedChildElement = vm;
+            Root.AddChild();
         }
 
-        private void RemoveChild(object obj)
+        private void RemoveChild(object _)
         {
             Root.RemoveChild(SelectedChildElement.ChildElement);
         }
 
         private void Root_ChildRemoved(object sender, ChildEventArgs e)
         {
-            var vm = ChildElements.FirstOrDefault(c => c.ChildElement == e.ChildElement);
-            Debug.Assert(!(vm is null));
-            ChildElements.Remove(vm);
+            // the event is called from client thread
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                var vm = ChildElements.FirstOrDefault(c => c.ChildElement == e.ChildElement);
+                Debug.Assert(!(vm is null));
+                ChildElements.Remove(vm);
+            });
         }
 
         private void Root_ChildAdded(object sender, ChildEventArgs e)
         {
-            ChildElements.Add(new ChildElementViewModel(e.ChildElement));
+            // the event is called from client thread
+            Application.Current.Dispatcher.Invoke(() => ChildElements.Add(new ChildElementViewModel(e.ChildElement)));
         }
 
     }
