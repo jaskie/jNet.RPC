@@ -5,7 +5,6 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
-using System.Xml.Serialization;
 using NLog;
 
 namespace jNet.RPC.Server
@@ -51,7 +50,7 @@ namespace jNet.RPC.Server
             return false;
         }
 
-        private void ListenerThreadProc()
+        private async void ListenerThreadProc()
         {
             try
             {
@@ -63,10 +62,10 @@ namespace jNet.RPC.Server
                         TcpClient client = null;
                         try
                         {
-                            client = _listener.AcceptTcpClient();
+                            client = await _listener.AcceptTcpClientAsync();
                             AddClient(client);
                         }
-                        catch (Exception e) when (e is SocketException || e is ThreadAbortException)
+                        catch (Exception e) when (e is SocketException || e is ThreadAbortException || e is ThreadInterruptedException)
                         {
                             Logger.Trace("{0} shutdown.", this);
                             break;
@@ -128,10 +127,10 @@ namespace jNet.RPC.Server
                 UnInitialize();
         }
 
-        public void UnInitialize()
+        private void UnInitialize()
         {
             _listener?.Stop();
-            _listenerThread?.Abort();
+            _listenerThread?.Interrupt();
         }
 
         public override string ToString()

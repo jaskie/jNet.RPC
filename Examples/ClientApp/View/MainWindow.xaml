@@ -1,0 +1,28 @@
+﻿<Window x:Class="ClientApp.View.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:view="clr-namespace:ClientApp.View"
+        xmlns:vm="clr-namespace:ClientApp.ViewModel"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="450" Width="800">
+    <Window.DataContext>
+        <vm:MainWindowViewModel/>
+    </Window.DataContext>
+    <Grid>
+        <Grid Visibility="{Binding IsConnecting, Converter={StaticResource booleanToVisibilityConverter}}">
+            <Border Background="Black" Opacity="0.3"/>
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock FontSize="26">Connecting...</TextBlock>
+            </StackPanel>
+        </Grid>
+        <ContentControl Content="{Binding RootElement}">
+            <ContentControl.Resources>
+                <DataTemplate DataType="{x:Type vm:RootElementViewModel}">
+                    <view:RootElementView/>
+                </DataTemplate>
+            </ContentControl.Resources>
+        </ContentControl>
+    </Grid>
+</Window>
