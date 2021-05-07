@@ -8,7 +8,6 @@ namespace jNet.RPC.Client
     {
         private BlockingCollection<Action> _executionQueue = new BlockingCollection<Action>();
         private Thread _exectionThread;
-        private ManualResetEventSlim _notificationEvent = new ManualResetEventSlim();
 
         public NotificationExecutor()
         {
@@ -36,7 +35,6 @@ namespace jNet.RPC.Client
         public void Dispose()
         {
             _executionQueue.Add(null);
-            _notificationEvent.Set();
             _exectionThread?.Join();
             _exectionThread = null;
         }

@@ -135,6 +135,7 @@ namespace jNet.RPC.Client
 
         internal void OnNotificationMessage(SocketMessage message)
         {
+            Logger.Trace("On NotificationMessage {0}", message);
             if (message.MemberName == nameof(INotifyPropertyChanged.PropertyChanged))
             {
                 var eav = Deserialize<PropertyChangedWithValueEventArgs>(message);

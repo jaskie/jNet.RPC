@@ -111,11 +111,13 @@ namespace jNet.RPC.Client
                             break;
 
                         case SocketMessage.SocketMessageType.EventNotification:
-                            var notifyObject = _referenceResolver.ResolveReference(message.DtoGuid);
-                            if (notifyObject == null)
-                                Logger.Debug("Proxy to notify not found for message: {0}", message);
-                            else
-                                _notificationExecutor.Queue(() => notifyObject.OnNotificationMessage(message));
+                                _notificationExecutor.Queue(() => {
+                                    var notifyObject = _referenceResolver.ResolveReference(message.DtoGuid);
+                                    if (notifyObject == null)
+                                        Logger.Debug("Proxy to notify not found for message: {0}", message);
+                                    else
+                                        notifyObject.OnNotificationMessage(message);
+                                });
                             break;
 
                         default:
@@ -143,7 +145,7 @@ namespace jNet.RPC.Client
             {
                 if (valueStream == null)
                     return default;
-                    
+                
                 using (var reader = new StreamReader(valueStream))
                 {
                     var obj = (T)Serializer.Deserialize(reader, typeof(T));
@@ -154,7 +156,7 @@ namespace jNet.RPC.Client
                             return obj;
                         try
                         {
-                            valueStream.Position = 0;
+                            reader.BaseStream.Position = 0;
                             Serializer.Populate(reader, target);
                         }
                         catch(Exception ex)

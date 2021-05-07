@@ -22,7 +22,7 @@ namespace jNet.RPC
         private int _disposed;
         private int _isConnected;
         private readonly BlockingCollection<byte[]> _sendQueue;
-        private readonly BlockingCollection<SocketMessage> _receiveQueue = new BlockingCollection<SocketMessage>(new ConcurrentQueue<SocketMessage>());
+        private readonly BlockingCollection<SocketMessage> _receiveQueue = new BlockingCollection<SocketMessage>();
 
         private Thread _readThread;
         private Thread _writeThread;
@@ -96,7 +96,7 @@ namespace jNet.RPC
             return false;
         }
 
-        internal void Send(SocketMessage message)
+        protected void Send(SocketMessage message)
         {
             if (_isConnected != default)
                 return;
