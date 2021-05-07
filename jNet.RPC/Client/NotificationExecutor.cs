@@ -8,6 +8,7 @@ namespace jNet.RPC.Client
     {
         private BlockingCollection<Action> _executionQueue = new BlockingCollection<Action>();
         private Thread _exectionThread;
+        private static NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
         public NotificationExecutor()
         {
@@ -21,7 +22,14 @@ namespace jNet.RPC.Client
             do
             {
                 action = _executionQueue.Take();
-                action?.Invoke();
+                try
+                {
+                    action?.Invoke();
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Exception invoking event notification");
+                }
             }
             while (action != null);
             
