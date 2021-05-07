@@ -2,6 +2,7 @@
 using NLog;
 using NLog.Config;
 using NLog.Targets;
+using ServerApp.Model;
 using System;
 
 namespace ServerApp

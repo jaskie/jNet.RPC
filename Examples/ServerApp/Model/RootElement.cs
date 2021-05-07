@@ -4,7 +4,7 @@ using SharedInterfaces;
 using System;
 using System.Collections.Generic;
 
-namespace ServerApp
+namespace ServerApp.Model
 {
     [DtoType(typeof(IRootElement))]
     class RootElement : ServerObjectBase, IRootElement
@@ -31,6 +31,7 @@ namespace ServerApp
             lock (_sync)
                 _childElements.Add(newChild);
             ChildAdded?.Invoke(this, new ChildEventArgs(newChild));
+            newChild.Value = 75;
             return newChild;
         }
 

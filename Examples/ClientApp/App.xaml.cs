@@ -1,4 +1,7 @@
-﻿using System;
+﻿using NLog;
+using NLog.Config;
+using NLog.Targets;
+using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Data;
@@ -13,5 +16,21 @@ namespace ClientApp
     /// </summary>
     public partial class App : Application
     {
+        static App()
+        {
+            ConfigureLogger();
+        }
+
+        static void ConfigureLogger()
+        {
+            var config = new LoggingConfiguration();
+            var debuggerTarget = new DebuggerTarget("debugger")
+            {
+                Layout = @"${date:format=HH\:mm\:ss} ${level} ${message} ${exception}"
+            };
+            config.AddTarget(debuggerTarget);
+            config.AddRuleForAllLevels(debuggerTarget);
+            LogManager.Configuration = config;
+        }
     }
 }

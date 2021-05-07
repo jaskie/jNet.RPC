@@ -2,13 +2,13 @@
 using jNet.RPC.Server;
 using SharedInterfaces;
 
-namespace ServerApp
+namespace ServerApp.Model
 {
     [DtoType(typeof(IChildElement))]
     class ChildElement : ServerObjectBase, IChildElement
     {
         private double _value;
-        private string _name;
+        private string _name = "Child initial name";
 
         [DtoMember]
         public double Value { get => _value; set => SetField(ref _value, value); }
