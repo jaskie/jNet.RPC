@@ -145,28 +145,28 @@ namespace jNet.RPC.Client
             {
                 if (valueStream == null)
                     return default;
-                
-                using (var reader = new StreamReader(valueStream))
-                {
-                    var obj = (T)Serializer.Deserialize(reader, typeof(T));
-                    if (obj is ProxyObjectBase target)
+
+                lock (this)
+                    using (var reader = new StreamReader(valueStream))
                     {
-                        var source = ((ReferenceResolver)ReferenceResolver).TakeProxyToPopulate(target.DtoGuid);
-                        if (source == null)
-                            return obj;
-                        try
+                        var obj = (T)Serializer.Deserialize(reader, typeof(T));
+                        if (obj is ProxyObjectBase target)
                         {
-                            reader.BaseStream.Position = 0;
-                            Serializer.Populate(reader, target);
+                            var source = ((ReferenceResolver)ReferenceResolver).TakeProxyToPopulate(target.DtoGuid);
+                            if (source == null)
+                                return obj;
+                            try
+                            {
+                                reader.BaseStream.Position = 0;
+                                Serializer.Populate(reader, target);
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Error(ex, "Error when populating {0}:{1}", source.DtoGuid, target.DtoGuid);
+                            }
                         }
-                        catch(Exception ex)
-                        {
-                            Logger.Error(ex, "Error when populating {0}:{1}", source.DtoGuid, target.DtoGuid);
-                        }
-                    }
-                    return obj;                    
-                }
-                    
+                        return obj;
+                    }                    
             }
         }
     }
