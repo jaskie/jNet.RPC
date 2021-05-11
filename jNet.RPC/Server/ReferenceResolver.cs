@@ -130,19 +130,21 @@ namespace jNet.RPC.Server
             return true;
         }
 
-        internal IDto FindMissingProxy(Guid dtoGuid)
+        internal IDto FindMissingDto(Guid dtoGuid)
         {
             lock (Sync)
             {
                 if (_knownDtos.TryGetValue(dtoGuid, out var dto))
+                {
+                    _knownDtos.Remove(dtoGuid); // need to serialize complete object if it's missing on client side
                     return dto;
+                }
                 dto = ServerObjectBase.FindDto(dtoGuid);
                 if (dto == null)
                 {
-                    Logger.Warn("Could not restore Dto (null on server side)! {0}", dto.DtoGuid);
+                    Logger.Warn("Could not find missing Dto {0}", dtoGuid);
                     return null;
                 }
-                _knownDtos[dtoGuid] = dto;
                 return dto;
             }
         }

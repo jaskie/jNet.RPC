@@ -72,8 +72,7 @@ namespace jNet.RPC.Server
                     }
                     if (message.MessageType == SocketMessage.SocketMessageType.ProxyMissing)
                     {
-                        var dto = _referenceResolver.FindMissingProxy(message.DtoGuid);
-                        _referenceResolver.RemoveReference(dto.DtoGuid);
+                        var dto = _referenceResolver.FindMissingDto(message.DtoGuid);
                         SendResponse(message, dto);
                         continue;
                     }
