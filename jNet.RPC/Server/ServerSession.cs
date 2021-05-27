@@ -57,12 +57,12 @@ namespace jNet.RPC.Server
         protected override void MessageHandlerProc()
         {
             Thread.CurrentPrincipal = _sessionUser;
-
-            while (!CancellationTokenSource.IsCancellationRequested)
+            var disconnectTokenSource = DisconnectTokenSource;
+            while (!disconnectTokenSource.IsCancellationRequested)
             {
                 try
                 {
-                    var message = TakeNextMessage();
+                    var message = TakeNextMessage(disconnectTokenSource.Token);
                     if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
                         Logger.Trace("Processing message: {0}", message);
                     if (message.MessageType == SocketMessage.SocketMessageType.RootQuery)

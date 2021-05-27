@@ -68,13 +68,14 @@ namespace jNet.RPC.Client
 
         internal T SendAndGetResponse<T>(SocketMessage query)
         {
+            var disconnectTokenSource = DisconnectTokenSource;
             try
             {
                 using (var messageRequest = new MessageRequest())
                 {
                     _requests.TryAdd(query.MessageGuid, messageRequest);
                     Send(query);
-                    var response = messageRequest.WaitForResult(CancellationTokenSource.Token);
+                    var response = messageRequest.WaitForResult(disconnectTokenSource.Token);
 
                     if (!_requests.TryRemove(query.MessageGuid, out var _))
                     {
@@ -89,18 +90,20 @@ namespace jNet.RPC.Client
             }
             catch (Exception e) when (e is OperationCanceledException || e is ObjectDisposedException)
             {
-                NotifyDisconnection();
+                if (!disconnectTokenSource.IsCancellationRequested)
+                    disconnectTokenSource.Cancel();
                 return default;
             }
         }
 
         protected override void MessageHandlerProc()
         {
-            while (!CancellationTokenSource.IsCancellationRequested)
+            var disconnectTokenSource = DisconnectTokenSource;
+            while (!disconnectTokenSource.IsCancellationRequested)
             {
                 try
                 {
-                    var message = TakeNextMessage();
+                    var message = TakeNextMessage(disconnectTokenSource.Token);
                     if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
                         Logger.Trace("Processing message: {0}", message);
 

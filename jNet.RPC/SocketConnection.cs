@@ -26,13 +26,15 @@ namespace jNet.RPC
 
         private Thread _readThread;
         private Thread _writeThread;
+        private Thread _messageHandlerThread;
+        private CancellationTokenRegistration _disconnectTokenRegistration;
 
         public TcpClient Client { get; private set; }
         internal JsonSerializer Serializer { get; } 
        
         protected IReferenceResolver ReferenceResolver { get; }
 
-        protected CancellationTokenSource CancellationTokenSource { get; } = new CancellationTokenSource();
+        protected CancellationTokenSource DisconnectTokenSource { get; private set; } 
 
         protected SocketConnection(TcpClient client, IReferenceResolver referenceResolver)
         {
@@ -100,6 +102,7 @@ namespace jNet.RPC
         {
             if (_isConnected != default)
                 return;
+            var disconnectTokenSource = DisconnectTokenSource;
             try
             {
                 var serializedData = message.MessageType == SocketMessage.SocketMessageType.EventNotification
@@ -108,7 +111,8 @@ namespace jNet.RPC
                 if (!_sendQueue.TryAdd(message.Encode(serializedData)))
                 {
                     Logger.Error("Message queue overflow with message {0}", message);
-                    NotifyDisconnection();
+                    if (!disconnectTokenSource.IsCancellationRequested)
+                        disconnectTokenSource.Cancel();
                     return;
                 }
                 if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
@@ -117,20 +121,33 @@ namespace jNet.RPC
             catch (Exception e)
             {
                 Logger.Error(e);
-                NotifyDisconnection();
+                if (!disconnectTokenSource.IsCancellationRequested)
+                    disconnectTokenSource.Cancel();
             }
         }
-        
+
+        private void Disconnect()
+        {
+            if (Interlocked.Exchange(ref _isConnected, 1) != default)
+                return;
+            _disconnectTokenRegistration.Dispose();
+            var tokenSource = DisconnectTokenSource;
+            if (!tokenSource.IsCancellationRequested)
+                tokenSource.Cancel();
+            _readThread.Join();
+            _writeThread.Join();
+            _messageHandlerThread.Join();
+            Client.Client?.Dispose();
+            DisconnectTokenSource = null;
+            tokenSource.Dispose();
+            Disconnected?.Invoke(this, EventArgs.Empty);
+        }
+
         protected virtual void OnDispose()
         {
-            if (!CancellationTokenSource.IsCancellationRequested)
-                CancellationTokenSource.Cancel();
-            Client.Client?.Dispose();
-            _readThread?.Join();
-            _writeThread?.Join();
+            Disconnect();
             _sendQueue.Dispose();
             _receiveQueue.Dispose();
-            CancellationTokenSource.Dispose();
         }
 
         public void Dispose()
@@ -142,6 +159,7 @@ namespace jNet.RPC
 
         protected void StartThreads()
         {
+            DisconnectTokenSource = new CancellationTokenSource();
             _readThread = new Thread(ReadThreadProc)
             {
                 IsBackground = true,
@@ -149,30 +167,38 @@ namespace jNet.RPC
             };
             _readThread.Start();
 
-            Task.Factory.StartNew(MessageHandlerProc, TaskCreationOptions.LongRunning);           
-
             _writeThread = new Thread(WriteThreadProc)
             {
                 IsBackground = true,
                 Name = $"TCP write thread for {Client.Client.RemoteEndPoint}"
             };
-            _writeThread.Start();            
+            _writeThread.Start();
+
+            _messageHandlerThread = new Thread(MessageHandlerProc)
+            {
+                IsBackground = true,
+                Name = $"Message handler thread for {Client.Client.RemoteEndPoint}"
+            };
+            _messageHandlerThread.Start();
+            _disconnectTokenRegistration = DisconnectTokenSource.Token.Register(Disconnect);
         }
 
         public event EventHandler Disconnected;
         protected abstract void MessageHandlerProc();
         protected virtual void WriteThreadProc()
         {
-            while (!CancellationTokenSource.IsCancellationRequested)
+            var disconnectTokenSource = DisconnectTokenSource;
+            while (!disconnectTokenSource.IsCancellationRequested)
             {
                 try
                 {
-                    var serializedMessage = _sendQueue.Take(CancellationTokenSource.Token);
+                    var serializedMessage = _sendQueue.Take(disconnectTokenSource.Token);
                     Client.Client.Send(serializedMessage);
                 }
                 catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is SocketException || e is OperationCanceledException)
                 {
-                    NotifyDisconnection();
+                    if (!disconnectTokenSource.IsCancellationRequested)
+                        disconnectTokenSource.Cancel();
                     return;
                 }
                 catch (Exception e)
@@ -182,20 +208,20 @@ namespace jNet.RPC
             }
         }
 
-        protected virtual void ReadThreadProc()
+        protected virtual async void ReadThreadProc()
         {
             var stream = Client.GetStream();
             byte[] dataBuffer = null;
             var sizeBuffer = new byte[sizeof(int)];
             var dataIndex = 0;
-
-            while (!CancellationTokenSource.IsCancellationRequested)
+            var disconnectTokenSource = DisconnectTokenSource;
+            while (!disconnectTokenSource.IsCancellationRequested)
             {
                 try
                 {
                     if (dataBuffer == null)
                     {
-                        var bytes = stream.Read(sizeBuffer, 0, sizeof(int));
+                        var bytes = await stream.ReadAsync(sizeBuffer, 0, sizeof(int), disconnectTokenSource.Token).ConfigureAwait(false);
                         if (bytes == sizeof(int))
                         {
                             var dataLength = BitConverter.ToUInt32(sizeBuffer, 0);
@@ -206,7 +232,7 @@ namespace jNet.RPC
                     }
                     else
                     {
-                        var receivedLength = stream.Read(dataBuffer, dataIndex, dataBuffer.Length - dataIndex);
+                        var receivedLength = await stream.ReadAsync(dataBuffer, dataIndex, dataBuffer.Length - dataIndex, disconnectTokenSource.Token).ConfigureAwait(false);
                         dataIndex += receivedLength;
                         if (dataIndex != dataBuffer.Length)
                             continue;
@@ -214,33 +240,29 @@ namespace jNet.RPC
                         if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
                             Logger.Trace("Message received: {0}", message);
                         _receiveQueue.Add(message);
-                        dataBuffer = null;                                               
+                        dataBuffer = null;
                     }
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
                 }
                 catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is SocketException)
                 {
-                    NotifyDisconnection();
+                    if (!disconnectTokenSource.IsCancellationRequested)
+                        disconnectTokenSource.Cancel();
                     return;
                 }
                 catch (Exception e)
                 {
-                    dataBuffer = null;
                     Logger.Error(e, "Read thread unexpected exception");
                 }
             }
         }
 
-        protected SocketMessage TakeNextMessage()
+        protected SocketMessage TakeNextMessage(CancellationToken token)
         {
-            return _receiveQueue.Take(CancellationTokenSource.Token);
-        }
-
-        protected void NotifyDisconnection()
-        {
-            if (Interlocked.Exchange(ref _isConnected, 1) != default)
-                return;
-            Logger.Info("Disconnected");
-            Task.Run(() => Disconnected?.Invoke(this, EventArgs.Empty));  //move the notifier out of calling  thread
+            return _receiveQueue.Take(token);
         }
 
         private Stream SerializeEventArgs(object eventArgs)
