@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 using NLog;
 
 namespace jNet.RPC.Server
@@ -12,10 +13,10 @@ namespace jNet.RPC.Server
     public class ServerHost : IDisposable, IRemoteHostConfig
     {
         private int _disposed;
-        private TcpListener _listener;
         private Thread _listenerThread;
         private IDto _rootServerObject;
         private IPrincipalProvider _principalProvider;
+        private CancellationTokenSource _shutdownTokenSource;
         private readonly List<ServerSession> _clients = new List<ServerSession>();
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
                 
@@ -31,10 +32,10 @@ namespace jNet.RPC.Server
         {
             if (ListenPort < 1024)
                 return false;
-            
+            Logger.Trace("Starting TCP listener on port {0}", ListenPort);
             try
             {
-                _listener = new TcpListener(IPAddress.Any, ListenPort) {ExclusiveAddressUse = true};
+                _shutdownTokenSource = new CancellationTokenSource();
                 _listenerThread = new Thread(ListenerThreadProc)
                 {
                     Name = $"Remote client session listener on port {ListenPort}",
@@ -54,15 +55,16 @@ namespace jNet.RPC.Server
         {
             try
             {
-                _listener.Start();
+                var listener = new TcpListener(IPAddress.Any, ListenPort) { ExclusiveAddressUse = true };
+                listener.Start();
                 try
                 {
-                    while (true)
+                    while (!_shutdownTokenSource.IsCancellationRequested)
                     {
                         TcpClient client = null;
                         try
                         {
-                            client = await _listener.AcceptTcpClientAsync();
+                            client = await Task.Run(() => listener.AcceptTcpClientAsync(), _shutdownTokenSource.Token);
                             AddClient(client);
                         }
                         catch (Exception e) when (e is SocketException || e is ThreadAbortException || e is ThreadInterruptedException)
@@ -82,7 +84,7 @@ namespace jNet.RPC.Server
                 }
                 finally
                 {
-                    _listener.Stop();
+                    listener.Stop();
                     List<ServerSession> serverSessionsCopy;
                     lock (((IList) _clients).SyncRoot)
                         serverSessionsCopy = _clients.ToList();
@@ -129,8 +131,7 @@ namespace jNet.RPC.Server
 
         private void UnInitialize()
         {
-            _listener?.Stop();
-            _listenerThread?.Interrupt();
+            _shutdownTokenSource.Cancel();
         }
 
         public override string ToString()

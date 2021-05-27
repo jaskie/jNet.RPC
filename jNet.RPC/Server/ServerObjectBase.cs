@@ -1,10 +1,7 @@
-﻿//#undef DEBUG
-
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Xml.Serialization;
@@ -36,7 +33,6 @@ namespace jNet.RPC.Server
         ~ServerObjectBase()
         {
             AllDtos.TryRemove(DtoGuid, out var _);
-            Debug.WriteLine(this, $"{GetType().FullName} Finalized");
         }
 
         protected virtual bool SetField<T>(ref T field, T value, [CallerMemberName]string propertyName = null)
