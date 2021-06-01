@@ -5,7 +5,7 @@ namespace jNet.RPC.Client
 {
     internal class MessageRequest: IDisposable
     {
-        private readonly ManualResetEventSlim _mutex = new ManualResetEventSlim();
+        private readonly ManualResetEvent _mutex = new ManualResetEvent(false);
         private SocketMessage _result;
 
         public void Dispose()
@@ -21,7 +21,7 @@ namespace jNet.RPC.Client
 
         public SocketMessage WaitForResult(CancellationToken token)
         {
-            _mutex.Wait(token);
+            WaitHandle.WaitAny(new[] { token.WaitHandle, _mutex });
             return _result;
         }
 
