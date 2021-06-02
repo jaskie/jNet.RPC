@@ -20,7 +20,6 @@ namespace jNet.RPC
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private int _disposed;
-        private int _isConnected;
         private readonly BlockingCollection<byte[]> _sendQueue;
         private readonly BlockingCollection<SocketMessage> _receiveQueue = new BlockingCollection<SocketMessage>();
 
@@ -92,15 +91,14 @@ namespace jNet.RPC
             }
             catch
             {
-                Client.Close();
-                Disconnected?.Invoke(this, EventArgs.Empty);
+                Dispose();
             }
             return false;
         }
 
         protected void Send(SocketMessage message)
         {
-            if (_isConnected != default)
+            if (!Client.Connected)
                 return;
             var disconnectTokenSource = DisconnectTokenSource;
             try
@@ -111,8 +109,7 @@ namespace jNet.RPC
                 if (!_sendQueue.TryAdd(message.Encode(serializedData)))
                 {
                     Logger.Error("Message queue overflow with message {0}", message);
-                    if (!disconnectTokenSource.IsCancellationRequested)
-                        disconnectTokenSource.Cancel();
+                    Shutdown(disconnectTokenSource);
                     return;
                 }
                 if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
@@ -121,33 +118,33 @@ namespace jNet.RPC
             catch (Exception e)
             {
                 Logger.Error(e);
-                if (!disconnectTokenSource.IsCancellationRequested)
-                    disconnectTokenSource.Cancel();
+                Shutdown(disconnectTokenSource);
             }
         }
 
-        private void Disconnect()
+        protected void Shutdown(CancellationTokenSource disconnectTokenSource)
         {
-            if (Interlocked.Exchange(ref _isConnected, 1) != default)
-                return;
-            _disconnectTokenRegistration.Dispose();
-            var tokenSource = DisconnectTokenSource;
-            if (!tokenSource.IsCancellationRequested)
-                tokenSource.Cancel();
-            _readThread.Join();
-            _writeThread.Join();
-            _messageHandlerThread.Join();
-            Client.Client?.Dispose();
-            DisconnectTokenSource = null;
-            tokenSource.Dispose();
-            Disconnected?.Invoke(this, EventArgs.Empty);
+            if (!disconnectTokenSource.IsCancellationRequested)
+                disconnectTokenSource.Cancel();
         }
 
         protected virtual void OnDispose()
         {
-            Disconnect();
+            _disconnectTokenRegistration.Dispose();
+            var tokenSource = DisconnectTokenSource;
+            if (tokenSource?.IsCancellationRequested == false)
+                tokenSource.Cancel();
+            _sendQueue.CompleteAdding();
+            _receiveQueue.CompleteAdding();
+            _readThread?.Join();
+            _writeThread?.Join();
+            _messageHandlerThread?.Join();
             _sendQueue.Dispose();
             _receiveQueue.Dispose();
+            Client.Close();
+            DisconnectTokenSource = null;
+            tokenSource?.Dispose();
+            Disconnected?.Invoke(this, EventArgs.Empty);
         }
 
         public void Dispose()
@@ -180,7 +177,7 @@ namespace jNet.RPC
                 Name = $"Message handler thread for {Client.Client.RemoteEndPoint}"
             };
             _messageHandlerThread.Start();
-            _disconnectTokenRegistration = DisconnectTokenSource.Token.Register(Disconnect);
+            _disconnectTokenRegistration = DisconnectTokenSource.Token.Register(Dispose);
         }
 
         public event EventHandler Disconnected;
@@ -195,10 +192,13 @@ namespace jNet.RPC
                     var serializedMessage = _sendQueue.Take(disconnectTokenSource.Token);
                     Client.Client.Send(serializedMessage);
                 }
-                catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is SocketException || e is OperationCanceledException)
+                catch (OperationCanceledException)
                 {
-                    if (!disconnectTokenSource.IsCancellationRequested)
-                        disconnectTokenSource.Cancel();
+                    return;
+                }
+                catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is SocketException)
+                {
+                    Shutdown(disconnectTokenSource);
                     return;
                 }
                 catch (Exception e)
@@ -249,8 +249,7 @@ namespace jNet.RPC
                 }
                 catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is SocketException)
                 {
-                    if (!disconnectTokenSource.IsCancellationRequested)
-                        disconnectTokenSource.Cancel();
+                    Shutdown(disconnectTokenSource);
                     return;
                 }
                 catch (Exception e)

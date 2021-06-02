@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.IO;
-using System.Threading;
 
 namespace jNet.RPC.Client
 {
@@ -69,6 +68,8 @@ namespace jNet.RPC.Client
         internal T SendAndGetResponse<T>(SocketMessage query)
         {
             var disconnectTokenSource = DisconnectTokenSource;
+            if (disconnectTokenSource is null)
+                return default;
             try
             {
                 using (var messageRequest = new MessageRequest())
@@ -82,7 +83,8 @@ namespace jNet.RPC.Client
                         Logger.Warn("SendAndGetResponse client trapped for message {0}", response);
                         return default;
                     }
-
+                    if (response is null)
+                        return default;
                     if (response.MessageType == SocketMessage.SocketMessageType.Exception)
                         throw Deserialize<Exception>(response);
                     return Deserialize<T>(response);
@@ -90,8 +92,7 @@ namespace jNet.RPC.Client
             }
             catch (Exception e) when (e is OperationCanceledException || e is ObjectDisposedException)
             {
-                if (!disconnectTokenSource.IsCancellationRequested)
-                    disconnectTokenSource.Cancel();
+                Shutdown(disconnectTokenSource);
                 return default;
             }
         }
