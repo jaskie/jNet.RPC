@@ -141,7 +141,7 @@ namespace jNet.RPC
             _messageHandlerThread?.Join();
             _sendQueue.Dispose();
             _receiveQueue.Dispose();
-            Client.Close();
+            Client.Client.Close();
             DisconnectTokenSource = null;
             tokenSource?.Dispose();
             Disconnected?.Invoke(this, EventArgs.Empty);
