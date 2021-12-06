@@ -98,7 +98,7 @@ namespace jNet.RPC
 
         protected void Send(SocketMessage message)
         {
-            if (!Client.Connected)
+            if (_sendQueue.IsAddingCompleted)
                 return;
             var disconnectTokenSource = DisconnectTokenSource;
             try
@@ -185,7 +185,7 @@ namespace jNet.RPC
         protected virtual void WriteThreadProc()
         {
             var disconnectTokenSource = DisconnectTokenSource;
-            while (!disconnectTokenSource.IsCancellationRequested)
+            while (!(disconnectTokenSource.IsCancellationRequested || _sendQueue.IsCompleted))
             {
                 try
                 {
@@ -215,7 +215,7 @@ namespace jNet.RPC
             var sizeBuffer = new byte[sizeof(int)];
             var dataIndex = 0;
             var disconnectTokenSource = DisconnectTokenSource;
-            while (!disconnectTokenSource.IsCancellationRequested)
+            while (!(disconnectTokenSource.IsCancellationRequested || _receiveQueue.IsAddingCompleted))
             {
                 try
                 {
