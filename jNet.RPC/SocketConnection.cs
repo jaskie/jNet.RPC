@@ -18,6 +18,12 @@ namespace jNet.RPC
     /// </summary>
     public abstract class SocketConnection : IDisposable
     {
+        private const int MessageQueueCapacity =
+#if DEBUG 
+            100;
+#else
+            10000;
+#endif
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private int _disposed;
         private readonly BlockingCollection<byte[]> _sendQueue;
@@ -56,7 +62,7 @@ namespace jNet.RPC
         protected SocketConnection(IReferenceResolver referenceResolver)
         {
             ReferenceResolver = referenceResolver;
-            _sendQueue = new BlockingCollection<byte[]>(0x10000);
+            _sendQueue = new BlockingCollection<byte[]>(MessageQueueCapacity);
             Serializer = JsonSerializer.CreateDefault(new JsonSerializerSettings
             {
                 ContractResolver = new SerializationContractResolver(),
