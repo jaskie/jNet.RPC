@@ -17,10 +17,11 @@ namespace ClientApp.ViewModel
         private RemoteClient _remoteClient;
         private string _connectionMessage;
         private RootElementViewModel _rootElement;
+        private bool _isDisposed;
 
         public MainWindowViewModel()
         {
-            Connect();
+            Task.Run(Connect);
         }
 
         public bool IsConnecting
@@ -64,20 +65,31 @@ namespace ClientApp.ViewModel
 
         public void Dispose()
         {
+            if (_isDisposed)
+                return;
+            _isDisposed = true;
             _rootElement?.Dispose();
+            if (_remoteClient is null)
+                return;
             _remoteClient.Disconnected -= RemoteClient_Disconnected;
             _remoteClient.Dispose();
+            _remoteClient = null;
         }
 
-        private async void Connect()
+        private void Connect()
         {
             var address = RemoteAddress;
             ConnectionMessage = $"Connecting to {address}";
             IsConnecting = true;
-            _remoteClient = new RemoteClient();
-            _remoteClient.Disconnected += RemoteClient_Disconnected;
-            if (!await _remoteClient.ConnectAsync(address))
+            while (!_isDisposed && _remoteClient is null)
+                try
+                {
+                    _remoteClient = new RemoteClient(address);
+                }
+                catch { }
+            if (_remoteClient is null)
                 return;
+            _remoteClient.Disconnected += RemoteClient_Disconnected;
             var root = _remoteClient.GetRootObject<IRootElement>();
             RootElement = new RootElementViewModel(root);
             IsConnecting = false;
@@ -87,6 +99,7 @@ namespace ClientApp.ViewModel
         {
             _remoteClient.Disconnected -= RemoteClient_Disconnected;
             _remoteClient.Dispose();
+            _remoteClient = null;
             Connect();
         }
     }

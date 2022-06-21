@@ -8,9 +8,10 @@ namespace jNet.RPC.Client
     {
         private BlockingCollection<Action> _executionQueue = new BlockingCollection<Action>();
         private Thread _exectionThread;
+        private readonly CancellationToken _cancellationToken;
         private static NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
-        public NotificationExecutor()
+        public NotificationExecutor(CancellationToken token)
         {
             _exectionThread = new Thread(ExecutionThreadProc) { Name = $"{nameof(NotificationExecutor)} thread"};
             _exectionThread.Start();
@@ -21,7 +22,7 @@ namespace jNet.RPC.Client
             Action action;
             do
             {
-                action = _executionQueue.Take();
+                action = _executionQueue.Take(_cancellationToken);
                 try
                 {
                     action?.Invoke();

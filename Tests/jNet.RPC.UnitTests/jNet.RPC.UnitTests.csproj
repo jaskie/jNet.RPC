@@ -55,7 +55,6 @@
     <Compile Include="MockModel\MockProxyObject.cs" />
     <Compile Include="MockModel\MockServerObject.cs" />
     <Compile Include="Server\DtoBaseTests.cs" />
-    <Compile Include="Server\ServerHostTests.cs" />
     <Compile Include="Server\ServerReferenceResolverTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

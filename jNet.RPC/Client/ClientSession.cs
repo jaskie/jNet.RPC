@@ -9,14 +9,16 @@ namespace jNet.RPC.Client
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();       
         private readonly ConcurrentDictionary<Guid, MessageRequest> _requests = new ConcurrentDictionary<Guid, MessageRequest>();
         private readonly ReferenceResolver _referenceResolver;
-        private readonly NotificationExecutor _notificationExecutor = new NotificationExecutor();
+        private readonly NotificationExecutor _notificationExecutor;
 
-        public ClientSession() : base(new ReferenceResolver())
+        public ClientSession(string address) : base(address, new ReferenceResolver())
         {
             _referenceResolver = ReferenceResolver as ReferenceResolver ?? throw new ApplicationException("Invalid reference resolver");
             _referenceResolver.ReferenceFinalized += Resolver_ReferenceFinalized;
             _referenceResolver.ReferenceResurected += Resolver_ReferenceResurrected;
             _referenceResolver.OnReferenceMissing = Resolver_ReferenceMissing;
+            _notificationExecutor = new NotificationExecutor(DisconnectTokenSource.Token);
+            StartThreads();
         }
 
 
@@ -67,8 +69,7 @@ namespace jNet.RPC.Client
 
         internal T SendAndGetResponse<T>(SocketMessage query)
         {
-            var disconnectTokenSource = DisconnectTokenSource;
-            if (disconnectTokenSource is null)
+            if (DisconnectTokenSource.IsCancellationRequested)
                 return default;
             try
             {
@@ -76,7 +77,7 @@ namespace jNet.RPC.Client
                 {
                     _requests.TryAdd(query.MessageGuid, messageRequest);
                     Send(query);
-                    var response = messageRequest.WaitForResult(disconnectTokenSource.Token);
+                    var response = messageRequest.WaitForResult(DisconnectTokenSource.Token);
 
                     if (!_requests.TryRemove(query.MessageGuid, out var _))
                     {
@@ -92,19 +93,18 @@ namespace jNet.RPC.Client
             }
             catch (Exception e) when (e is OperationCanceledException || e is ObjectDisposedException)
             {
-                Shutdown(disconnectTokenSource);
+                Shutdown();
                 return default;
             }
         }
 
         protected override void MessageHandlerProc()
         {
-            var disconnectTokenSource = DisconnectTokenSource;
-            while (!disconnectTokenSource.IsCancellationRequested)
+            while (!DisconnectTokenSource.IsCancellationRequested)
             {
                 try
                 {
-                    var message = TakeNextMessage(disconnectTokenSource.Token);
+                    var message = TakeNextMessage(DisconnectTokenSource.Token);
                     if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
                         Logger.Trace("Processing message: {0}", message);
 
@@ -115,13 +115,14 @@ namespace jNet.RPC.Client
                             break;
 
                         case SocketMessage.SocketMessageType.EventNotification:
-                                _notificationExecutor.Queue(() => {
-                                    var notifyObject = _referenceResolver.ResolveReference(message.DtoGuid);
-                                    if (notifyObject == null)
-                                        Logger.Debug("Proxy to notify not found for message: {0}", message);
-                                    else
-                                        notifyObject.OnNotificationMessage(message);
-                                });
+                            _notificationExecutor.Queue(() =>
+                            {
+                                var notifyObject = _referenceResolver.ResolveReference(message.DtoGuid);
+                                if (notifyObject == null)
+                                    Logger.Debug("Proxy to notify not found for message: {0}", message);
+                                else
+                                    notifyObject.OnNotificationMessage(message);
+                            });
                             break;
 
                         default:

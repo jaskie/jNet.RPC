@@ -16,23 +16,23 @@ namespace jNet.RPC.Server
     {
         private readonly Dictionary<DelegateKey, Delegate> _delegates = new Dictionary<DelegateKey, Delegate>();
         private readonly IPrincipal _sessionUser;
+        private readonly IPEndPoint _remoteAddress;
         private readonly IDto _initialObject;
         private readonly ReferenceResolver _referenceResolver;
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
         public ServerSession(TcpClient client, IDto initialObject, IPrincipalProvider principalProvider): base(client, new ReferenceResolver())
         {
+            _remoteAddress = client.Client.RemoteEndPoint as IPEndPoint ?? throw new ArgumentException("Client RemoteEndpoint is invalid");
             Serializer.SerializationBinder = new SerializationBinder();
             _initialObject = initialObject;
-            _referenceResolver = ReferenceResolver as ReferenceResolver ?? throw new ApplicationException("Invalid reference resolver");
-            if (!(client.Client.RemoteEndPoint is IPEndPoint))
-                throw new UnauthorizedAccessException("Client RemoteEndpoint is invalid");
+            _referenceResolver = ReferenceResolver as ReferenceResolver ?? throw new ApplicationException("Invalid reference resolver");                
             _sessionUser = principalProvider.GetPrincipal(client);
             if (_sessionUser == null)
-                throw new UnauthorizedAccessException($"Client {Client.Client.RemoteEndPoint} not allowed");
-            Logger.Info("Client {0} from {1} successfully connected", _sessionUser.Identity, Client.Client.RemoteEndPoint);
+                throw new UnauthorizedAccessException($"Remote client {_remoteAddress} not allowed");
+            Logger.Info("Remote {0} from {1} successfully connected", _sessionUser.Identity, _remoteAddress);
             _referenceResolver.ReferencePropertyChanged += ReferenceResolver_ReferencePropertyChanged;
-            StartThreads();    
+            StartThreads();
         }
 
 #if DEBUG
@@ -215,10 +215,11 @@ namespace jNet.RPC.Server
                 }
             }
             _referenceResolver.Dispose();
+            Logger.Info("Remote {0} from {1} disconnected", _sessionUser.Identity, _remoteAddress);
         }
 
         private void SendResponse(SocketMessage message, object response)
-        {            
+        {
             Send(new SocketMessage(message, response));
         }
 
@@ -259,7 +260,7 @@ namespace jNet.RPC.Server
         }
 
         private void NotifyClient(IDto dto, EventArgs e, string eventName)
-        {            
+        {
             try
             {
                 if (e is WrappedEventArgs ea

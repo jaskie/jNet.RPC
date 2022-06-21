@@ -16,7 +16,7 @@ namespace jNet.RPC.Server
         private Thread _listenerThread;
         private IDto _rootServerObject;
         private IPrincipalProvider _principalProvider;
-        private CancellationTokenSource _shutdownTokenSource;
+        private readonly CancellationTokenSource _shutdownTokenSource;
         private readonly List<ServerSession> _clients = new List<ServerSession>();
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
                 
@@ -27,11 +27,7 @@ namespace jNet.RPC.Server
             ListenPort = listenPort;
             _rootServerObject = rootObject;
             _principalProvider = principalProvider ?? PrincipalProvider.Default;
-        }
-        public bool Start()
-        {
-            if (ListenPort < 1024)
-                return false;
+
             Logger.Trace("Starting TCP listener on port {0}", ListenPort);
             try
             {
@@ -42,13 +38,13 @@ namespace jNet.RPC.Server
                     IsBackground = true
                 };
                 _listenerThread.Start();
-                return true;
             }
             catch(Exception e)
             {
                 Logger.Error(e, "Initialization of {0} error.", this);
+                _shutdownTokenSource.Cancel();
+                throw;
             }
-            return false;
         }
 
         private async void ListenerThreadProc()

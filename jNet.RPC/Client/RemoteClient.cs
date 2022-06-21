@@ -8,12 +8,12 @@ namespace jNet.RPC.Client
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
-        public RemoteClient() : base()
+        public RemoteClient(string address) : base(address)
         {
             Serializer.SerializationBinder = new SerializationBinder();
         }
 
-        public RemoteClient(ISerializationBinder serializationBinder) : base()
+        public RemoteClient(string address, ISerializationBinder serializationBinder) : base(address)
         {
             Serializer.SerializationBinder = serializationBinder;
         }
