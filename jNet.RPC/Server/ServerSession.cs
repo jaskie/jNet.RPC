@@ -21,15 +21,13 @@ namespace jNet.RPC.Server
         private readonly ReferenceResolver _referenceResolver;
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
-        public ServerSession(TcpClient client, IDto initialObject, IPrincipalProvider principalProvider): base(client, new ReferenceResolver())
+        public ServerSession(TcpClient client, IDto initialObject, IPrincipal sessionUser): base(client, new ReferenceResolver())
         {
             _remoteAddress = client.Client.RemoteEndPoint as IPEndPoint ?? throw new ArgumentException("Client RemoteEndpoint is invalid");
+            _sessionUser = sessionUser;
             Serializer.SerializationBinder = new SerializationBinder();
             _initialObject = initialObject;
             _referenceResolver = ReferenceResolver as ReferenceResolver ?? throw new ApplicationException("Invalid reference resolver");                
-            _sessionUser = principalProvider.GetPrincipal(client);
-            if (_sessionUser == null)
-                throw new UnauthorizedAccessException($"Remote client {_remoteAddress} not allowed");
             Logger.Info("Remote {0} from {1} successfully connected", _sessionUser.Identity, _remoteAddress);
             _referenceResolver.ReferencePropertyChanged += ReferenceResolver_ReferencePropertyChanged;
             StartThreads();
@@ -57,12 +55,11 @@ namespace jNet.RPC.Server
         protected override void MessageHandlerProc()
         {
             Thread.CurrentPrincipal = _sessionUser;
-            var disconnectTokenSource = DisconnectTokenSource;
-            while (!disconnectTokenSource.IsCancellationRequested)
+            while (!DisconnectTokenSource.IsCancellationRequested)
             {
                 try
                 {
-                    var message = TakeNextMessage(disconnectTokenSource.Token);
+                    var message = TakeNextMessage();
                     if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
                         Logger.Trace("Processing message: {0}", message);
                     if (message.MessageType == SocketMessage.SocketMessageType.RootQuery)

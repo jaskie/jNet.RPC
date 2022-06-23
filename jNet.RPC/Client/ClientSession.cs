@@ -17,7 +17,7 @@ namespace jNet.RPC.Client
             _referenceResolver.ReferenceFinalized += Resolver_ReferenceFinalized;
             _referenceResolver.ReferenceResurected += Resolver_ReferenceResurrected;
             _referenceResolver.OnReferenceMissing = Resolver_ReferenceMissing;
-            _notificationExecutor = new NotificationExecutor(DisconnectTokenSource.Token);
+            _notificationExecutor = new NotificationExecutor();
             StartThreads();
         }
 
@@ -39,7 +39,7 @@ namespace jNet.RPC.Client
                 e.Proxy,
                 string.Empty,
                 0,
-                null));            
+                null));
         }
 
         private void Resolver_ReferenceResurrected(object sender, ProxyObjectBaseEventArgs e)
@@ -104,7 +104,7 @@ namespace jNet.RPC.Client
             {
                 try
                 {
-                    var message = TakeNextMessage(DisconnectTokenSource.Token);
+                    var message = TakeNextMessage();
                     if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
                         Logger.Trace("Processing message: {0}", message);
 

@@ -8,32 +8,33 @@ namespace jNet.RPC.Client
     {
         private BlockingCollection<Action> _executionQueue = new BlockingCollection<Action>();
         private Thread _exectionThread;
-        private readonly CancellationToken _cancellationToken;
         private static NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+        private bool _isDisposed;
 
-        public NotificationExecutor(CancellationToken token)
+        public NotificationExecutor()
         {
-            _exectionThread = new Thread(ExecutionThreadProc) { Name = $"{nameof(NotificationExecutor)} thread"};
+            _exectionThread = new Thread(ExecutionThreadProc) { Name = $"{nameof(NotificationExecutor)} thread", IsBackground = true};
             _exectionThread.Start();
         }
 
         private void ExecutionThreadProc()
         {
-            Action action;
-            do
+            while (true)
             {
-                action = _executionQueue.Take(_cancellationToken);
+                Action action = _executionQueue.Take();
                 try
                 {
-                    action?.Invoke();
+                    if (action is null)
+                        break;
+                    else
+                        action.Invoke();
                 }
                 catch (Exception e)
                 {
                     Logger.Error(e, "Exception invoking event notification");
                 }
             }
-            while (action != null);
-            
+            Logger.Debug("NotificationExecutor thread finished");
         }
 
         public void Queue(Action action)
@@ -43,9 +44,12 @@ namespace jNet.RPC.Client
 
         public void Dispose()
         {
+            if (_isDisposed)
+                return;
+            _isDisposed = true;
             _executionQueue.Add(null);
-            _exectionThread?.Join();
-            _exectionThread = null;
+            _exectionThread.Join();
+            _executionQueue.Dispose();
         }
     }
 }

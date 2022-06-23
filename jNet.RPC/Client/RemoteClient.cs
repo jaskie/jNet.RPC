@@ -152,6 +152,6 @@ namespace jNet.RPC.Client
                 Logger.Error(e, "From EventRemove: {0}:{1}", dto, eventName);
                 throw;
             }
-        }        
+        }
     }
 }

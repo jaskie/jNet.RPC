@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
@@ -61,16 +62,19 @@ namespace jNet.RPC.Server
                         try
                         {
                             client = await Task.Run(() => listener.AcceptTcpClientAsync(), _shutdownTokenSource.Token);
-                            AddClient(client);
+                            var sessionUser = _principalProvider.GetPrincipal(client);
+                            if (sessionUser == null)
+                            {
+                                Logger.Warn($"Remote client {client.Client.RemoteEndPoint} not allowed");
+                                client.Close();
+                            }
+                            else
+                                AddClient(client, sessionUser);
                         }
                         catch (Exception e) when (e is SocketException || e is ThreadAbortException || e is ThreadInterruptedException)
                         {
                             Logger.Trace("{0} shutdown.", this);
                             break;
-                        }
-                        catch (UnauthorizedAccessException)
-                        {
-                            Logger.Warn("{0} Unauthorized client from: {1}", this, client?.Client.RemoteEndPoint);
                         }
                         catch (Exception e)
                         {
@@ -93,9 +97,9 @@ namespace jNet.RPC.Server
             }
         }
 
-        private void AddClient(TcpClient client)
+        private void AddClient(TcpClient client, IPrincipal user)
         {
-            var clientSession = new ServerSession(client, _rootServerObject, _principalProvider);
+            var clientSession = new ServerSession(client, _rootServerObject, user);
             clientSession.Disconnected += ClientSessionDisconnected;
             lock (((IList)_clients).SyncRoot)
                 _clients.Add(clientSession);

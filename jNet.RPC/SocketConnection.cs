@@ -20,7 +20,7 @@ namespace jNet.RPC
     {
         private const int MessageQueueCapacity =
 #if DEBUG 
-            100;
+            1000;
 #else
             100000;
 #endif
@@ -129,6 +129,7 @@ namespace jNet.RPC
         {
             if (DisconnectTokenSource.IsCancellationRequested)
                 return;
+            Logger.Info("Disconnected from {0}", Client.Client.RemoteEndPoint);
             Client.Client.Close();
             DisconnectTokenSource.Cancel();
         }
@@ -198,26 +199,38 @@ namespace jNet.RPC
             var stream = Client.GetStream();
             byte[] dataBuffer = null;
             var sizeBuffer = new byte[sizeof(int)];
-            var dataIndex = 0;
+            int dataIndex = 0;
+            int receivedBytesCount;
             while (!DisconnectTokenSource.IsCancellationRequested)
             {
                 try
                 {
                     if (dataBuffer == null)
                     {
-                        var bytes = stream.Read(sizeBuffer, 0, sizeof(int));
-                        if (bytes == sizeof(int))
+                        receivedBytesCount = stream.Read(sizeBuffer, 0, sizeof(int));
+                        if (receivedBytesCount == sizeof(int))
                         {
                             var dataLength = BitConverter.ToUInt32(sizeBuffer, 0);
                             dataBuffer = new byte[dataLength];
                         }
-                        else { }
+                        else if (receivedBytesCount == 0)
+                        {
+                            Shutdown();
+                            return;
+                        }
+                        else
+                            Logger.Warn("Can't read data length");
                         dataIndex = 0;
                     }
                     else
                     {
-                        var receivedLength = stream.Read(dataBuffer, dataIndex, dataBuffer.Length - dataIndex);
-                        dataIndex += receivedLength;
+                        receivedBytesCount = stream.Read(dataBuffer, dataIndex, dataBuffer.Length - dataIndex);
+                        if (receivedBytesCount == 0)
+                        {
+                            Shutdown();
+                            return;
+                        }
+                        dataIndex += receivedBytesCount;
                         if (dataIndex != dataBuffer.Length)
                             continue;
                         var message = new SocketMessage(dataBuffer);
@@ -244,9 +257,9 @@ namespace jNet.RPC
             }
         }
 
-        protected SocketMessage TakeNextMessage(CancellationToken token)
+        protected SocketMessage TakeNextMessage()
         {
-            return _receiveQueue.Take(token);
+            return _receiveQueue.Take(DisconnectTokenSource.Token);
         }
 
         private Stream SerializeEventArgs(object eventArgs)
