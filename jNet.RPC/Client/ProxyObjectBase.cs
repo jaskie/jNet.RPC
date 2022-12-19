@@ -1,11 +1,6 @@
-﻿#undef DEBUG
-
-using System;
-using System.Collections.Concurrent;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -19,24 +14,8 @@ namespace jNet.RPC.Client
         private int _isDisposed;
         private int _isFinalizeRequested;
         private RemoteClient _client;
-        
-        internal static readonly ConcurrentDictionary<Guid, ProxyObjectBase> FinalizeRequested = new ConcurrentDictionary<Guid, ProxyObjectBase>();
+        private static NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
-
-        internal static bool TryResurect(Guid dtoGuid, out ProxyObjectBase finalizeRequested)
-        {
-            if (FinalizeRequested.TryGetValue(dtoGuid, out finalizeRequested))
-            {
-                finalizeRequested.Resurrect();
-                return true;
-            }
-            return false;
-        }
-
-        internal static bool TryGetFinalizeRequested(Guid dtoGuid, out ProxyObjectBase finalizeRequested)
-        {
-            return FinalizeRequested.TryGetValue(dtoGuid, out finalizeRequested);
-        }
 
         public void Dispose()
         {
@@ -48,42 +27,27 @@ namespace jNet.RPC.Client
         {
             if (Interlocked.Exchange(ref _isFinalizeRequested, 1) == default) //first finalization will send request to server; on response hard reference will be deleted and object collected in next GC run
             {
-                if (!FinalizeRequested.TryAdd(DtoGuid, this))
-                    Debug.WriteLine($"Could not save object {DtoGuid}");
-                else
-                    Debug.WriteLine($"Saving object {DtoGuid}");
+                
                 Finalized?.Invoke(this, EventArgs.Empty);
                 GC.ReRegisterForFinalize(this);
             }
             else
             {
-                Debug.WriteLine($"Proxy {DtoGuid} finalized");
+                Logger.Trace("Proxy {0} finalized", DtoGuid);
             }                
         }
 
-
-        public void Resurrect()
-        {                        
-            FinalizeRequested.TryRemove(DtoGuid, out _);
-            _isFinalizeRequested = default;
-            Debug.WriteLine($"Trying to resurrect {DtoGuid}");
-            Resurrected?.Invoke(this, EventArgs.Empty);            
-        }
-
-        public void FinalizeProxy()
+        internal void Resurect()
         {
-            FinalizeRequested.TryRemove(DtoGuid, out _);
-            Debug.WriteLine("Proxy strong reference delete {0}", DtoGuid);
-            Debug.WriteLine(FinalizeRequested.Count);
-        }                
+            if (Interlocked.Exchange(ref _isFinalizeRequested, default) == default)
+                Logger.Warn("Proxy was not requested for finalization {0}", DtoGuid);
+            GC.ReRegisterForFinalize(this);
+        }
 
         public Guid DtoGuid { get; internal set; }        
 
         public event PropertyChangedEventHandler PropertyChanged;
-
-        public event EventHandler Disposed;
-        
-        internal event EventHandler Resurrected;
+       
         internal event EventHandler Finalized;        
 
         protected T Get<T>([CallerMemberName] string propertyName = null)
@@ -93,7 +57,6 @@ namespace jNet.RPC.Client
             if (string.IsNullOrEmpty(propertyName))
                 return default;
             var result = _client.Get<T>(this, propertyName);
-            Debug.WriteLine($"Get:{result} for property {propertyName} of {this}");
             return result;
         }
 
@@ -154,7 +117,6 @@ namespace jNet.RPC.Client
         protected virtual void DoDispose()
         {
             _client = null;
-            Disposed?.Invoke(this, EventArgs.Empty);
         }
 
         [OnDeserialized]
@@ -167,23 +129,17 @@ namespace jNet.RPC.Client
         {
             if (_client == null)
                 return default;
-            using (var valueStream = message.ValueStream)
-            {
-                if (valueStream == null)
-                    return default;
-                using (var reader = new StreamReader(valueStream))
-                    return (T) _client.Serializer.Deserialize(reader, typeof(T));
-            }
+            return _client.Deserialize<T>(message);
         }
 
         internal void OnNotificationMessage(SocketMessage message)
         {
+            Logger.Trace("On NotificationMessage {0}", message);
             if (message.MemberName == nameof(INotifyPropertyChanged.PropertyChanged))
             {
                 var eav = Deserialize<PropertyChangedWithValueEventArgs>(message);
                 if (eav == null)
                     return;
-                Debug.WriteLine($"{this}: property notified {eav.PropertyName}, value {eav.Value}");
                 var type = GetType();
                 var field = GetField(type, eav.PropertyName);
                 if (field == null)

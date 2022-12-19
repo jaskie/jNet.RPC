@@ -39,8 +39,8 @@
     <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <HintPath>..\packages\Newtonsoft.Json.12.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
+    <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\..\..\packages\Newtonsoft.Json.13.0.2\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
       <HintPath>..\packages\NLog.4.6.8\lib\net45\NLog.dll</HintPath>
@@ -61,6 +61,8 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Client\NotificationExecutor.cs" />
+    <Compile Include="Client\ProxyBuilder.cs" />
     <Compile Include="ProxyNamespaceAttribute.cs" />
     <Compile Include="BitmapJsonConverter.cs" />
     <Compile Include="Client\ReferenceResolver.cs" />
@@ -73,6 +75,7 @@
     <Compile Include="IRemoteHostConfig.cs" />
     <Compile Include="PropertyChangedWithValueEventArgs.cs" />
     <Compile Include="SerializationContractResolver.cs" />
+    <Compile Include="Server\DelegateKey.cs" />
     <Compile Include="Server\SerializationBinder.cs" />
     <Compile Include="Server\IPrincipalProvider.cs" />
     <Compile Include="Server\PrincipalProvider.cs" />

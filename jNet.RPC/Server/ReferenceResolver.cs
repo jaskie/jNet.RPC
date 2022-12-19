@@ -11,7 +11,7 @@ namespace jNet.RPC.Server
     internal class ReferenceResolver : IReferenceResolver, IDisposable
     {
         private readonly Dictionary<Guid, ServerObjectBase> _knownDtos = new Dictionary<Guid, ServerObjectBase>();        
-        public static readonly object Sync = new object();
+        public readonly object Sync = new object();
         private int _disposed;
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
@@ -124,11 +124,31 @@ namespace jNet.RPC.Server
                     return false;
                 }
                 _knownDtos.Add(dto.DtoGuid, dto);
-                Logger.Debug("Object ressurection acknowledged {0}", dto.DtoGuid);
+                Logger.Trace("Object ressurection acknowledged {0}", dto.DtoGuid);
             }
             
             return true;
         }
+
+        internal IDto FindMissingDto(Guid dtoGuid)
+        {
+            lock (Sync)
+            {
+                if (_knownDtos.TryGetValue(dtoGuid, out var dto))
+                {
+                    _knownDtos.Remove(dtoGuid); // need to serialize complete object if it's missing on client side
+                    return dto;
+                }
+                dto = ServerObjectBase.FindDto(dtoGuid);
+                if (dto == null)
+                {
+                    Logger.Warn("Could not find missing Dto {0}", dtoGuid);
+                    return null;
+                }
+                return dto;
+            }
+        }
+
 
         internal event EventHandler<WrappedEventArgs> ReferencePropertyChanged;
 
@@ -140,15 +160,15 @@ namespace jNet.RPC.Server
         }
 
 
-        public void RemoveReference(IDto dto)
+        public void RemoveReference(Guid dtoGuid)
         {
             lock(Sync)
             {
-                if (!_knownDtos.TryGetValue(dto.DtoGuid, out var removed))
+                if (!_knownDtos.TryGetValue(dtoGuid, out var removed))
                     return;
 
                 removed.PropertyChanged -= Dto_PropertyChanged;
-                _knownDtos.Remove(dto.DtoGuid);
+                _knownDtos.Remove(dtoGuid);
             }                            
         }
     }

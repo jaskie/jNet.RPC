@@ -60,7 +60,8 @@ namespace jNet.RPC.UnitTests.Client
             var knownDtosInitialCount = _knownDtos.Count;
             _clientReferenceResolver.AddReference(this, _mockObject.DtoGuid.ToString(), _mockObject);
             PrivateObject po = new PrivateObject(_clientReferenceResolver);
-            Assert.AreEqual(po.GetArrayElement("_proxiesToPopulate", 0), _mockObject, "Wrong object added to population.");
+            var dict = (Dictionary<Guid, ProxyObjectBase>)po.GetField("_proxiesToPopulate");
+            Assert.AreEqual(dict[_mockObject.DtoGuid], _mockObject, "Wrong object added to population.");
             Assert.AreEqual(knownDtosInitialCount, _knownDtos.Count, "KnownDtos shouldn't increased!");
         }
         #endregion
@@ -107,34 +108,6 @@ namespace jNet.RPC.UnitTests.Client
             Assert.AreEqual(_mockObject, proxy);
         }
 
-        [TestMethod]
-        public void ResolveReference_ReferenceResurrected_ReturnObject()
-        {           
-            WeakReference<ProxyObjectBase> weakReference = null;
-            Guid guid = Guid.Empty;
-
-            new Action(() =>
-            {
-                var mockObject = new MockProxyObject { DtoGuid = Guid.NewGuid() };
-                weakReference = new WeakReference<ProxyObjectBase>(mockObject, true);
-                _knownDtos.Add(mockObject.DtoGuid, new WeakReference<ProxyObjectBase>(mockObject));
-                guid = new Guid(mockObject.DtoGuid.ToString());
-            })();
-
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-
-            if (ProxyObjectBase.FinalizeRequested.Count < 1)
-                Assert.Fail("Object did not finalize or finalized instantly");
-
-            new Action(() =>
-            {
-                weakReference.TryGetTarget(out var target);            
-                var proxy = _clientReferenceResolver.ResolveReference(this, target.DtoGuid.ToString());
-                Assert.AreEqual(target, proxy, "Proxy did not resurrected properly");
-            })();            
-        }
-        
         [TestMethod]
         public void ResolveReference_NonReferenced_ReturnNull()
         {            

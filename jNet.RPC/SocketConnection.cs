@@ -18,27 +18,35 @@ namespace jNet.RPC
     /// </summary>
     public abstract class SocketConnection : IDisposable
     {
+        private const int MessageQueueCapacity =
+#if DEBUG 
+            1000;
+#else
+            100000;
+#endif
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private int _disposed;
         private readonly BlockingCollection<byte[]> _sendQueue;
-        private readonly BlockingCollection<SocketMessage> _receiveQueue = new BlockingCollection<SocketMessage>(new ConcurrentQueue<SocketMessage>());
+        private readonly BlockingCollection<SocketMessage> _receiveQueue = new BlockingCollection<SocketMessage>();
 
-        private Thread _readThread;
-        private Thread _writeThread;
+        private readonly Thread _readThread;
+        private readonly Thread _writeThread;
+        private readonly Thread _messageHandlerThread;
+        private CancellationTokenRegistration _disconnectTokenRegistration;
 
         public TcpClient Client { get; private set; }
-        internal JsonSerializer Serializer { get; } 
+        internal JsonSerializer Serializer { get; }
        
         protected IReferenceResolver ReferenceResolver { get; }
 
-        protected CancellationTokenSource CancellationTokenSource { get; } = new CancellationTokenSource();
+        protected CancellationTokenSource DisconnectTokenSource { get; } = new CancellationTokenSource();
 
         protected SocketConnection(TcpClient client, IReferenceResolver referenceResolver)
         {
             Client = client;
             client.NoDelay = true;
             ReferenceResolver = referenceResolver;
-            _sendQueue = new BlockingCollection<byte[]>(0x1000);
+            _sendQueue = new BlockingCollection<byte[]>(0x100000);
             Serializer = JsonSerializer.CreateDefault(new JsonSerializerSettings
             {
                 ContractResolver = new SerializationContractResolver(),
@@ -49,12 +57,15 @@ namespace jNet.RPC
                 Formatting = Formatting.Indented
 #endif
             });
+            _readThread = CreateThread(ReadThreadProc, $"jNet.RPC read thread for {Client.Client.RemoteEndPoint}");
+            _writeThread = CreateThread(WriteThreadProc, $"jNet.RPC write thread for {Client.Client.RemoteEndPoint}");
+            _messageHandlerThread = CreateThread(MessageHandlerProc, $"jNet.RPC message handler thread for {Client.Client.RemoteEndPoint}");
         }
 
-        protected SocketConnection(IReferenceResolver referenceResolver)
+        protected SocketConnection(string address, IReferenceResolver referenceResolver)
         {
             ReferenceResolver = referenceResolver;
-            _sendQueue = new BlockingCollection<byte[]>(0x10000);
+            _sendQueue = new BlockingCollection<byte[]>(MessageQueueCapacity);
             Serializer = JsonSerializer.CreateDefault(new JsonSerializerSettings
             {
                 ContractResolver = new SerializationContractResolver(),
@@ -65,38 +76,33 @@ namespace jNet.RPC
                 Formatting = Formatting.Indented
 #endif
             });
-        }
 
-        public async Task<bool> ConnectAsync(string address)
-        {
             var port = 1060;
             var addressParts = address.Split(':');
             if (addressParts.Length > 1)
                 int.TryParse(addressParts[1], out port);
-
-            Client = new TcpClient
-            {
-                NoDelay = true,                
-            };
-
             try
             {
-                await Client.ConnectAsync(addressParts[0], port).ConfigureAwait(false);
-                Logger.Info("Connection opened to {0}:{1}.", addressParts[0], port);
-                StartThreads();
-                return true;
+                Logger.Info("Connecting to {0}:{1}", addressParts[0], port);
+                Client = new TcpClient(addressParts[0], port) { NoDelay = true };
             }
-            catch
+            catch (Exception e)
             {
-                Client.Close();
-                Disconnected?.Invoke(this, EventArgs.Empty);
+                _sendQueue.Dispose();
+                _receiveQueue.Dispose();
+                DisconnectTokenSource.Dispose();
+                Logger.Info(e, "Unable to connect to  {0}:{1}", addressParts[0], port);
+                throw e;
             }
-            return false;
+            Logger.Info("Connected to {0}:{1}", addressParts[0], port);
+            _readThread = CreateThread(ReadThreadProc, $"jNet.RPC read thread for {address}");
+            _writeThread = CreateThread(WriteThreadProc, $"jNet.RPC write thread for {address}");
+            _messageHandlerThread = CreateThread(MessageHandlerProc, $"jNet.RPC message handler thread for {address}");
         }
 
-        internal void Send(SocketMessage message)
+        protected void Send(SocketMessage message)
         {
-            if (!IsConnected)
+            if (_sendQueue.IsAddingCompleted)
                 return;
             try
             {
@@ -105,34 +111,45 @@ namespace jNet.RPC
                     : SerializeDto(message.Value);
                 if (!_sendQueue.TryAdd(message.Encode(serializedData)))
                 {
-                    Logger.Error("Message queue overflow");
-                    NotifyDisconnection();
+                    Logger.Error("Message queue overflow with message {0}", message);
+                    Shutdown();
                     return;
                 }
                 if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
-                    Logger.Trace("Message queued to send {0}:{1}:{2}", message.MessageGuid, message.DtoGuid, message.MessageType);
+                    Logger.Trace("Message queued to send: {0}", message);
             }
             catch (Exception e)
             {
                 Logger.Error(e);
-                NotifyDisconnection();
+                Shutdown();
             }
         }
 
-        public bool IsConnected { get; private set; } = true;
-        
+        protected void Shutdown()
+        {
+            if (DisconnectTokenSource.IsCancellationRequested)
+                return;
+            Logger.Info("Disconnected from {0}", Client.Client.RemoteEndPoint);
+            Client.Client.Close();
+            DisconnectTokenSource.Cancel();
+        }
+
         protected virtual void OnDispose()
         {
-            if (!CancellationTokenSource.IsCancellationRequested)
-                CancellationTokenSource.Cancel();
-            Client.Client?.Dispose();
-            _readThread?.Join();
-            _writeThread?.Join();
+            _disconnectTokenRegistration.Dispose();
+            Shutdown();
+            _sendQueue.CompleteAdding();
+            _receiveQueue.CompleteAdding();
+            if (Thread.CurrentThread.ManagedThreadId != _readThread.ManagedThreadId)
+                _readThread.Join();
+            if (Thread.CurrentThread.ManagedThreadId != _writeThread.ManagedThreadId)
+                _writeThread.Join();
+            if (Thread.CurrentThread.ManagedThreadId != _messageHandlerThread.ManagedThreadId)
+                _messageHandlerThread.Join();
             _sendQueue.Dispose();
             _receiveQueue.Dispose();
-            CancellationTokenSource.Dispose();
-            IsConnected = false;
-            Logger.Info("Connection closed.");
+            DisconnectTokenSource.Dispose();
+            Disconnected?.Invoke(this, EventArgs.Empty);
         }
 
         public void Dispose()
@@ -144,37 +161,30 @@ namespace jNet.RPC
 
         protected void StartThreads()
         {
-            _readThread = new Thread(ReadThreadProc)
-            {
-                IsBackground = true,
-                Name = $"TCP read thread for {Client.Client.RemoteEndPoint}"
-            };
             _readThread.Start();
-
-            Task.Factory.StartNew(MessageHandlerProc, TaskCreationOptions.LongRunning);           
-
-            _writeThread = new Thread(WriteThreadProc)
-            {
-                IsBackground = true,
-                Name = $"TCP write thread for {Client.Client.RemoteEndPoint}"
-            };
-            _writeThread.Start();            
+            _writeThread.Start();
+            _messageHandlerThread.Start();
+            _disconnectTokenRegistration = DisconnectTokenSource.Token.Register(Dispose);
         }
 
         public event EventHandler Disconnected;
         protected abstract void MessageHandlerProc();
         protected virtual void WriteThreadProc()
         {
-            while (!CancellationTokenSource.IsCancellationRequested)
+            while (!DisconnectTokenSource.IsCancellationRequested)
             {
                 try
                 {
-                    var serializedMessage = _sendQueue.Take(CancellationTokenSource.Token);
+                    var serializedMessage = _sendQueue.Take(DisconnectTokenSource.Token);
                     Client.Client.Send(serializedMessage);
                 }
-                catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is SocketException || e is OperationCanceledException)
+                catch (OperationCanceledException)
                 {
-                    NotifyDisconnection();
+                    return;
+                }
+                catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is SocketException)
+                {
+                    Shutdown();
                     return;
                 }
                 catch (Exception e)
@@ -189,44 +199,59 @@ namespace jNet.RPC
             var stream = Client.GetStream();
             byte[] dataBuffer = null;
             var sizeBuffer = new byte[sizeof(int)];
-            var dataIndex = 0;
-
-            while (!CancellationTokenSource.IsCancellationRequested)
+            int dataIndex = 0;
+            int receivedBytesCount;
+            while (!DisconnectTokenSource.IsCancellationRequested)
             {
                 try
                 {
                     if (dataBuffer == null)
                     {
-                        var bytes = stream.Read(sizeBuffer, 0, sizeof(int));
-                        if (bytes == sizeof(int))
+                        receivedBytesCount = stream.Read(sizeBuffer, 0, sizeof(int));
+                        if (receivedBytesCount == sizeof(int))
                         {
                             var dataLength = BitConverter.ToUInt32(sizeBuffer, 0);
                             dataBuffer = new byte[dataLength];
                         }
-                        else { }
+                        else if (receivedBytesCount == 0)
+                        {
+                            Shutdown();
+                            return;
+                        }
+                        else
+                            Logger.Warn("Can't read data length");
                         dataIndex = 0;
                     }
                     else
                     {
-                        var receivedLength = stream.Read(dataBuffer, dataIndex, dataBuffer.Length - dataIndex);
-                        dataIndex += receivedLength;
+                        receivedBytesCount = stream.Read(dataBuffer, dataIndex, dataBuffer.Length - dataIndex);
+                        if (receivedBytesCount == 0)
+                        {
+                            Shutdown();
+                            return;
+                        }
+                        dataIndex += receivedBytesCount;
                         if (dataIndex != dataBuffer.Length)
                             continue;
                         var message = new SocketMessage(dataBuffer);
                         if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
-                            Logger.Debug("Message received {0}:{1}", message.MessageGuid, message.MessageType);
+                            Logger.Trace("Message received: {0}", message);
                         _receiveQueue.Add(message);
-                        dataBuffer = null;                                               
+                        dataBuffer = null;
                     }
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
                 }
                 catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is SocketException)
                 {
-                    NotifyDisconnection();
+                    Shutdown();
                     return;
                 }
                 catch (Exception e)
                 {
-                    dataBuffer = null;
+                    Shutdown();
                     Logger.Error(e, "Read thread unexpected exception");
                 }
             }
@@ -234,15 +259,7 @@ namespace jNet.RPC
 
         protected SocketMessage TakeNextMessage()
         {
-            return _receiveQueue.Take(CancellationTokenSource.Token);
-        }
-
-        protected void NotifyDisconnection()
-        {
-            if (!IsConnected)
-                return;
-            IsConnected = false;
-            Task.Run(() => Disconnected?.Invoke(this, EventArgs.Empty));  //move the notifier out of calling  thread
+            return _receiveQueue.Take(DisconnectTokenSource.Token);
         }
 
         private Stream SerializeEventArgs(object eventArgs)
@@ -252,6 +269,16 @@ namespace jNet.RPC
                 Serializer.Serialize(writer, eventArgs);
             return serialized;
 
+        }
+
+        private Thread CreateThread(ThreadStart threadStart, string threadName)
+        {
+            return  new Thread(threadStart)
+            {
+                IsBackground = true,
+                Name = threadName,
+                Priority = ThreadPriority.AboveNormal
+            };
         }
 
         protected Stream SerializeDto(object dto)

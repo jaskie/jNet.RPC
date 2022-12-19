@@ -1,10 +1,7 @@
-﻿//#undef DEBUG
-
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Xml.Serialization;
@@ -25,19 +22,17 @@ namespace jNet.RPC.Server
 
         protected ServerObjectBase()
         {
-            DtoGuid = Guid.NewGuid();
             AllDtos.TryAdd(DtoGuid, new WeakReference<ServerObjectBase>(this));
         }
 
         [XmlIgnore]
-        public Guid DtoGuid { get; }
+        public Guid DtoGuid { get; } = Guid.NewGuid();
 
         private int _disposed;
 
         ~ServerObjectBase()
         {
             AllDtos.TryRemove(DtoGuid, out var _);
-            Debug.WriteLine(this, $"{GetType().FullName} Finalized");
         }
 
         protected virtual bool SetField<T>(ref T field, T value, [CallerMemberName]string propertyName = null)
@@ -50,14 +45,11 @@ namespace jNet.RPC.Server
 
         public event PropertyChangedEventHandler PropertyChanged;
 
-        public event EventHandler Disposed;
-
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _disposed, 1) != default)
                 return;
             DoDispose();
-            Disposed?.Invoke(this, EventArgs.Empty);
         }
 
         protected bool IsDisposed => _disposed != default;

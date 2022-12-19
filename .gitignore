@@ -14,3 +14,9 @@
 /Tests/Tests.CommonLibrary/obj
 /Tests/Tests.CommonLibrary/bin
 /TestResults
+/Examples/ClientApp/bin
+/Examples/ClientApp/obj
+/Examples/ServerApp/bin
+/Examples/ServerApp/obj
+/Examples/SharedInterfaces/bin
+/Examples/SharedInterfaces/obj

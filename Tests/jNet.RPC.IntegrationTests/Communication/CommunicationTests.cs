@@ -15,15 +15,14 @@ namespace jNet.RPC.IntegrationTests.Communication
         private static Tests.ServerLibrary.MockRoot  _mockObject;
 
         [ClassInitialize]
-        public async static Task SetUpServerClient(TestContext context)
+        public static void SetUpServerClient(TestContext context)
         {  
             _mockObject = new Tests.ServerLibrary.MockRoot();
             
             _server = new ServerHost(1100, _mockObject);            
-            _server.Start();
 
-            _client = new RemoteClient();
-            await _client.ConnectAsync("127.0.0.1:1100");
+            _client = new RemoteClient("127.0.0.1:1100");
+            _client.AddProxyAssembly(typeof(Tests.ClientLibrary.MockRoot).Assembly);
         }
 
         [ClassCleanup]

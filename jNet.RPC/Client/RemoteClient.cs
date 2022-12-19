@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json.Serialization;
+using System;
 using System.Reflection;
 
 namespace jNet.RPC.Client
@@ -7,9 +8,14 @@ namespace jNet.RPC.Client
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
-        public RemoteClient() : base()
+        public RemoteClient(string address) : base(address)
         {
             Serializer.SerializationBinder = new SerializationBinder();
+        }
+
+        public RemoteClient(string address, ISerializationBinder serializationBinder) : base(address)
+        {
+            Serializer.SerializationBinder = serializationBinder;
         }
 
         public void AddProxyAssembly(Assembly assembly)
@@ -28,7 +34,7 @@ namespace jNet.RPC.Client
             }
             catch (Exception e)
             {
-                Logger.Error(e, $"From {nameof(GetRootObject)}:");
+                Logger.Error(e, $"From {nameof(GetRootObject)}:{typeof(T)}");
                 throw;
             }
         }
@@ -47,7 +53,7 @@ namespace jNet.RPC.Client
             }
             catch (Exception e)
             {
-                Logger.Error("From Query for {0}: {1}", dto, e);
+                Logger.Error(e, "From Query {0}:{1}", dto, methodName);
                 throw;
             }
         }
@@ -67,7 +73,7 @@ namespace jNet.RPC.Client
             }
             catch (Exception e)
             {
-                Logger.Error("From Get {0}: {1}", dto, e);
+                Logger.Error(e, "From Get {0}:{1}", dto, propertyName);
                 throw;
             }
         }
@@ -86,7 +92,7 @@ namespace jNet.RPC.Client
             }
             catch (Exception e)
             {
-                Logger.Error("From Invoke {0}: {1}", dto, e);
+                Logger.Error(e, "From Invoke {0}:{1}", dto, methodName);
                 throw;
             }
         }
@@ -105,7 +111,7 @@ namespace jNet.RPC.Client
             }
             catch (Exception e)
             {
-                Logger.Error("From Set {0}: {1}", dto, e);
+                Logger.Error(e, "From Set {0}:{1}", dto, propertyName);
                 throw;
             }
         }
@@ -124,7 +130,7 @@ namespace jNet.RPC.Client
             }
             catch (Exception e)
             {
-                Logger.Error("From Invoke {0}: {1}", dto, e);
+                Logger.Error(e, "From EventAdd {0}:{1}", dto, eventName);
                 throw;
             }
         }
@@ -143,9 +149,9 @@ namespace jNet.RPC.Client
             }
             catch (Exception e)
             {
-                Logger.Error("From Invoke {0}: {1}", dto, e);
+                Logger.Error(e, "From EventRemove: {0}:{1}", dto, eventName);
                 throw;
             }
-        }        
+        }
     }
 }

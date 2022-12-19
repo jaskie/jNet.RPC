@@ -4,8 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Principal;
 using System.Threading;
-using System.Xml.Serialization;
+using System.Threading.Tasks;
 using NLog;
 
 namespace jNet.RPC.Server
@@ -13,10 +14,10 @@ namespace jNet.RPC.Server
     public class ServerHost : IDisposable, IRemoteHostConfig
     {
         private int _disposed;
-        private TcpListener _listener;
         private Thread _listenerThread;
         private IDto _rootServerObject;
         private IPrincipalProvider _principalProvider;
+        private readonly CancellationTokenSource _shutdownTokenSource;
         private readonly List<ServerSession> _clients = new List<ServerSession>();
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
                 
@@ -27,53 +28,53 @@ namespace jNet.RPC.Server
             ListenPort = listenPort;
             _rootServerObject = rootObject;
             _principalProvider = principalProvider ?? PrincipalProvider.Default;
-        }
-        public bool Start()
-        {
-            if (ListenPort < 1024)
-                return false;
-            
+
+            Logger.Trace("Starting TCP listener on port {0}", ListenPort);
             try
             {
-                _listener = new TcpListener(IPAddress.Any, ListenPort) {ExclusiveAddressUse = true};
+                _shutdownTokenSource = new CancellationTokenSource();
                 _listenerThread = new Thread(ListenerThreadProc)
                 {
                     Name = $"Remote client session listener on port {ListenPort}",
                     IsBackground = true
                 };
                 _listenerThread.Start();
-                return true;
             }
             catch(Exception e)
             {
                 Logger.Error(e, "Initialization of {0} error.", this);
+                _shutdownTokenSource.Cancel();
+                throw;
             }
-            return false;
         }
 
-        private void ListenerThreadProc()
+        private async void ListenerThreadProc()
         {
             try
             {
-                _listener.Start();
+                var listener = new TcpListener(IPAddress.Any, ListenPort) { ExclusiveAddressUse = true };
+                listener.Start();
                 try
                 {
-                    while (true)
+                    while (!_shutdownTokenSource.IsCancellationRequested)
                     {
                         TcpClient client = null;
                         try
                         {
-                            client = _listener.AcceptTcpClient();
-                            AddClient(client);
+                            client = await Task.Run(() => listener.AcceptTcpClientAsync(), _shutdownTokenSource.Token);
+                            var sessionUser = _principalProvider.GetPrincipal(client);
+                            if (sessionUser == null)
+                            {
+                                Logger.Warn($"Remote client {client.Client.RemoteEndPoint} not allowed");
+                                client.Close();
+                            }
+                            else
+                                AddClient(client, sessionUser);
                         }
-                        catch (Exception e) when (e is SocketException || e is ThreadAbortException)
+                        catch (Exception e) when (e is SocketException || e is ThreadAbortException || e is ThreadInterruptedException)
                         {
                             Logger.Trace("{0} shutdown.", this);
                             break;
-                        }
-                        catch (UnauthorizedAccessException)
-                        {
-                            Logger.Warn("{0} Unauthorized client from: {1}", this, client?.Client.RemoteEndPoint);
                         }
                         catch (Exception e)
                         {
@@ -83,7 +84,7 @@ namespace jNet.RPC.Server
                 }
                 finally
                 {
-                    _listener.Stop();
+                    listener.Stop();
                     List<ServerSession> serverSessionsCopy;
                     lock (((IList) _clients).SyncRoot)
                         serverSessionsCopy = _clients.ToList();
@@ -96,9 +97,9 @@ namespace jNet.RPC.Server
             }
         }
 
-        private void AddClient(TcpClient client)
+        private void AddClient(TcpClient client, IPrincipal user)
         {
-            var clientSession = new ServerSession(client, _rootServerObject, _principalProvider);
+            var clientSession = new ServerSession(client, _rootServerObject, user);
             clientSession.Disconnected += ClientSessionDisconnected;
             lock (((IList)_clients).SyncRoot)
                 _clients.Add(clientSession);
@@ -128,10 +129,9 @@ namespace jNet.RPC.Server
                 UnInitialize();
         }
 
-        public void UnInitialize()
+        private void UnInitialize()
         {
-            _listener?.Stop();
-            _listenerThread?.Abort();
+            _shutdownTokenSource.Cancel();
         }
 
         public override string ToString()
