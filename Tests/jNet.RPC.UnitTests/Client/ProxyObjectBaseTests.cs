@@ -34,8 +34,7 @@ namespace jNet.RPC.UnitTests.Client
             new Action(() =>
             {
                 weakRefernce.TryGetTarget(out var target);
-                var priv = new PrivateObject(target, new PrivateType(typeof(ProxyObjectBase)));
-                Assert.IsFalse((int)priv.GetField("_isFinalizeRequested") == default, "Object not prepared for collection!");
+                Assert.IsFalse(target.IsFinalizeRequested == default, "Object not prepared for collection!");
             })();
 
             GC.Collect(); //first collect (mark as finalized)

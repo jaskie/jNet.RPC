@@ -14,8 +14,7 @@ namespace jNet.RPC.UnitTests.Server
         public void GetReferenceTest_Referenced_ReturnDto()
         {
             var serverReferenceResolver = new ReferenceResolver();
-            PrivateObject po = new PrivateObject(serverReferenceResolver);
-            var _knownDtos = ((Dictionary<Guid, ServerObjectBase>)po.GetField("_knownDtos"));
+            var _knownDtos = serverReferenceResolver.KnownDtos;
             var mockObject = new MockServerObject("TestValue");
             _knownDtos.Add(mockObject.DtoGuid, mockObject);
 
@@ -41,9 +40,8 @@ namespace jNet.RPC.UnitTests.Server
         public void GetReferenceTest_NonReferenced_ReturnDto()
         {
             var serverReferenceResolver = new ReferenceResolver();
-            PrivateObject po = new PrivateObject(serverReferenceResolver);
             var mockObject = new MockServerObject("TestValue");
-            var _knownDtos = ((Dictionary<Guid, ServerObjectBase>)po.GetField("_knownDtos"));
+            var _knownDtos = serverReferenceResolver.KnownDtos;
 
 
             var _knownDtosCount = _knownDtos.Count;
@@ -86,20 +84,19 @@ namespace jNet.RPC.UnitTests.Server
         [TestMethod]
         public void ResolveReferenceTest_UnknownGuid_ReturnNull()
         {
-            var serverReferenceResolver = new ReferenceResolver();            
+            var serverReferenceResolver = new ReferenceResolver();
             
             var dto = serverReferenceResolver.ResolveReference(new Guid());
 
-            Assert.IsNull(dto, "dto not null!");            
+            Assert.IsNull(dto, "dto not null!");
         }
 
         [TestMethod]
         public void ResolveReferenceTest_Referenced_ReturnDto()
         {
             var serverReferenceResolver = new ReferenceResolver();
-            PrivateObject po = new PrivateObject(serverReferenceResolver);
             var mockObject = new MockServerObject("TestValue");
-            var _knownDtos = ((Dictionary<Guid, ServerObjectBase>)po.GetField("_knownDtos"));
+            var _knownDtos = serverReferenceResolver.KnownDtos;
             _knownDtos.Add(mockObject.DtoGuid, mockObject);
 
             var _knownDtosCount = _knownDtos.Count;
@@ -115,9 +112,8 @@ namespace jNet.RPC.UnitTests.Server
         public void ResolveReferenceTest_NonReferenced_ReturnDto()
         {
             var serverReferenceResolver = new ReferenceResolver();
-            PrivateObject po = new PrivateObject(serverReferenceResolver);
             var mockObject = new MockServerObject("TestValue");
-            var _knownDtos = ((Dictionary<Guid, ServerObjectBase>)po.GetField("_knownDtos"));
+            var _knownDtos = serverReferenceResolver.KnownDtos;
 
             var _knownDtosCount = _knownDtos.Count;
 

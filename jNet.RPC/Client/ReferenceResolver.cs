@@ -13,7 +13,6 @@ namespace jNet.RPC.Client
 
         private int _disposed;
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
-        
 
         public void Dispose()
         {
@@ -30,27 +29,27 @@ namespace jNet.RPC.Client
             var id = new Guid(reference);
             proxy.DtoGuid = id;
             lock(((IDictionary)_knownDtos).SyncRoot)
-            {                
+            {
                 if (!_knownDtos.ContainsKey(id))
                 {
                     _knownDtos.Add(id, new WeakReference<ProxyObjectBase>(proxy, true));
                     proxy.Finalized += Proxy_Finalized;
-                    Logger.Trace("AddReference {0} for {1}", reference, value);                    
+                    Logger.Trace("AddReference {0} for {1}", reference, value);
                 }
                 else
                 {
                     _proxiesToPopulate[proxy.DtoGuid] = proxy;
                     Logger.Debug("AddReference already in knownDtos, will populate {0}", proxy.GetType());
-                }                    
-            }            
-        }        
+                }
+            }
+        }
 
         public string GetReference(object context, object value)
         {
             if (!(value is ProxyObjectBase proxy)) 
                 return string.Empty;
 
-            return proxy.DtoGuid.ToString();                       
+            return proxy.DtoGuid.ToString();
         }
 
 
@@ -58,7 +57,7 @@ namespace jNet.RPC.Client
         {
             if (!(value is IDto))
                 return false;
-            return true;            
+            return true;
         }
 
         public object ResolveReference(object context, string reference)
@@ -98,7 +97,7 @@ namespace jNet.RPC.Client
                 if (_knownDtos.TryGetValue(reference, out var p) && p.TryGetTarget(out var target))
                     return target;
                 return null;
-            }                     
+            }
         }
 
         internal ProxyObjectBase TakeProxyToPopulate(Guid dtoGuid)
@@ -161,8 +160,14 @@ namespace jNet.RPC.Client
                 Logger.Trace("Deleting from knowndtos {0}", proxy.DtoGuid);
                 _knownDtos.Remove(proxy.DtoGuid);
                 ReferenceFinalized?.Invoke(this, new ProxyObjectBaseEventArgs(proxy));
-            }            
+            }
         }
+
+        #region Test properties
+        internal Dictionary<Guid, WeakReference<ProxyObjectBase>> KnownDtos => _knownDtos;
+        internal Dictionary<Guid, ProxyObjectBase> ProxiesToPopulate => _proxiesToPopulate;
+        internal Dictionary<Guid, ProxyObjectBase> FinalizeRequested => _finalizeRequested;
+        #endregion
 
     }
 

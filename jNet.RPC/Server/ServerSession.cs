@@ -79,14 +79,14 @@ namespace jNet.RPC.Server
                     {
                         switch (message.MessageType)
                         {
-                            case SocketMessage.SocketMessageType.Query:
+                            case SocketMessage.SocketMessageType.MethodExecute:
                                 var objectToInvokeType = objectToInvoke.GetType();
                                 var methodToInvoke = objectToInvokeType.GetMethods()
                                     .FirstOrDefault(m => m.Name == message.MemberName &&
                                                          m.GetParameters().Length == message.ParametersCount);
                                 if (methodToInvoke != null)
                                 {
-                                    var parameters = DeserializeDto<SocketMessageArrayValue>(message.ValueStream);
+                                    var parameters = DeserializeDto<SocketMessageArrayValue>(message.GetValueStream());
                                     var methodParameters = methodToInvoke.GetParameters();
                                     for (var i = 0; i < methodParameters.Length; i++)
                                         MethodParametersAlignment.AlignType(ref parameters.Value[i],
@@ -107,7 +107,7 @@ namespace jNet.RPC.Server
                                     throw new ApplicationException(
                                         $"Server: unknown method: {objectToInvoke}:{message.MemberName}");
                                 break;
-                            case SocketMessage.SocketMessageType.Get:
+                            case SocketMessage.SocketMessageType.PropertyGet:
                                 var getProperty = objectToInvoke.GetType().GetProperty(message.MemberName);
                                 if (getProperty != null)
                                 {
@@ -127,11 +127,11 @@ namespace jNet.RPC.Server
                                     throw new ApplicationException(
                                         $"Server: unknown property: {objectToInvoke}:{message.MemberName}");
                                 break;
-                            case SocketMessage.SocketMessageType.Set:
+                            case SocketMessage.SocketMessageType.PropertySet:
                                 var setProperty = objectToInvoke.GetType().GetProperty(message.MemberName);
                                 if (setProperty != null)
                                 {
-                                    var parameter = DeserializeDto<object>(message.ValueStream);
+                                    var parameter = DeserializeDto<object>(message.GetValueStream());
                                     MethodParametersAlignment.AlignType(ref parameter, setProperty.PropertyType);
                                     try
                                     {

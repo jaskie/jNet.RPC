@@ -44,7 +44,7 @@ namespace jNet.RPC.Client
             try
             {
                 var queryMessage = SocketMessage.Create(
-                    SocketMessage.SocketMessageType.Query,
+                    SocketMessage.SocketMessageType.MethodExecute,
                     dto,
                     methodName,
                     parameters.Length,
@@ -63,7 +63,7 @@ namespace jNet.RPC.Client
             try
             {
                 var queryMessage = SocketMessage.Create(
-                    SocketMessage.SocketMessageType.Get,
+                    SocketMessage.SocketMessageType.PropertyGet,
                     dto,
                     propertyName,
                     0,
@@ -83,7 +83,7 @@ namespace jNet.RPC.Client
             try
             {
                 var queryMessage = SocketMessage.Create(
-                    SocketMessage.SocketMessageType.Query,
+                    SocketMessage.SocketMessageType.MethodExecute,
                     dto,
                     methodName,
                     parameters.Length,
@@ -102,7 +102,7 @@ namespace jNet.RPC.Client
             try
             {
                 var queryMessage = SocketMessage.Create(
-                SocketMessage.SocketMessageType.Set,
+                SocketMessage.SocketMessageType.PropertySet,
                 dto,
                 propertyName,
                 1,

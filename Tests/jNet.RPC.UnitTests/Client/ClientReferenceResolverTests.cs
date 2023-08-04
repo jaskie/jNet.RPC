@@ -10,7 +10,7 @@ namespace jNet.RPC.UnitTests.Client
     public class ClientReferenceResolverTests
     {
         ReferenceResolver _clientReferenceResolver;
-        Dictionary<Guid, WeakReference<ProxyObjectBase>> _knownDtos;        
+        Dictionary<Guid, WeakReference<ProxyObjectBase>> _knownDtos;
         MockProxyObject _mockObject;
 
         [TestInitialize]
@@ -18,9 +18,7 @@ namespace jNet.RPC.UnitTests.Client
         {
             _mockObject = new MockProxyObject { DtoGuid = Guid.NewGuid() };
             _clientReferenceResolver = new ReferenceResolver();
-
-            var po = new PrivateObject(_clientReferenceResolver);            
-            _knownDtos = ((Dictionary<Guid, WeakReference<ProxyObjectBase>>)po.GetField("_knownDtos"));
+            _knownDtos = _clientReferenceResolver.KnownDtos;
         }
 
         #region ResolveReference_Guid
@@ -59,8 +57,7 @@ namespace jNet.RPC.UnitTests.Client
 
             var knownDtosInitialCount = _knownDtos.Count;
             _clientReferenceResolver.AddReference(this, _mockObject.DtoGuid.ToString(), _mockObject);
-            PrivateObject po = new PrivateObject(_clientReferenceResolver);
-            var dict = (Dictionary<Guid, ProxyObjectBase>)po.GetField("_proxiesToPopulate");
+            var dict = _clientReferenceResolver.ProxiesToPopulate;
             Assert.AreEqual(dict[_mockObject.DtoGuid], _mockObject, "Wrong object added to population.");
             Assert.AreEqual(knownDtosInitialCount, _knownDtos.Count, "KnownDtos shouldn't increased!");
         }
@@ -102,7 +99,7 @@ namespace jNet.RPC.UnitTests.Client
         [TestMethod]
         public void ResolveReference_ReferenceAlive_ReturnDto()
         {
-            _knownDtos.Add(_mockObject.DtoGuid, new WeakReference<ProxyObjectBase>(_mockObject));           
+            _knownDtos.Add(_mockObject.DtoGuid, new WeakReference<ProxyObjectBase>(_mockObject));
 
             var proxy = _clientReferenceResolver.ResolveReference(this, _mockObject.DtoGuid.ToString());
             Assert.AreEqual(_mockObject, proxy);

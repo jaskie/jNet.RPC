@@ -146,7 +146,7 @@ namespace jNet.RPC.Client
 
         internal T Deserialize<T>(SocketMessage message)
         {
-            using (var valueStream = message.ValueStream)
+            using (var valueStream = message.GetValueStream())
             {
                 if (valueStream == null)
                     return default;
@@ -171,7 +171,7 @@ namespace jNet.RPC.Client
                             }
                         }
                         return obj;
-                    }                    
+                    }
             }
         }
     }

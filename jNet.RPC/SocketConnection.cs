@@ -32,14 +32,13 @@ namespace jNet.RPC
         private readonly Thread _readThread;
         private readonly Thread _writeThread;
         private readonly Thread _messageHandlerThread;
+        private readonly JsonSerializer _serializer;
+        protected readonly CancellationTokenSource DisconnectTokenSource = new CancellationTokenSource();
         private CancellationTokenRegistration _disconnectTokenRegistration;
 
         public TcpClient Client { get; private set; }
-        internal JsonSerializer Serializer { get; }
-       
-        protected IReferenceResolver ReferenceResolver { get; }
-
-        protected CancellationTokenSource DisconnectTokenSource { get; } = new CancellationTokenSource();
+        internal JsonSerializer Serializer => _serializer;
+        protected readonly IReferenceResolver ReferenceResolver;
 
         protected SocketConnection(TcpClient client, IReferenceResolver referenceResolver)
         {
@@ -47,7 +46,7 @@ namespace jNet.RPC
             client.NoDelay = true;
             ReferenceResolver = referenceResolver;
             _sendQueue = new BlockingCollection<byte[]>(0x100000);
-            Serializer = JsonSerializer.CreateDefault(new JsonSerializerSettings
+            _serializer = JsonSerializer.CreateDefault(new JsonSerializerSettings
             {
                 ContractResolver = new SerializationContractResolver(),
                 ReferenceResolverProvider = () => referenceResolver,
@@ -66,7 +65,7 @@ namespace jNet.RPC
         {
             ReferenceResolver = referenceResolver;
             _sendQueue = new BlockingCollection<byte[]>(MessageQueueCapacity);
-            Serializer = JsonSerializer.CreateDefault(new JsonSerializerSettings
+            _serializer = JsonSerializer.CreateDefault(new JsonSerializerSettings
             {
                 ContractResolver = new SerializationContractResolver(),
                 Context = new StreamingContext(StreamingContextStates.Remoting, this),
@@ -228,7 +227,7 @@ namespace jNet.RPC
                         if (receivedBytesCount == 0)
                         {
                             Shutdown();
-                            return;
+                            break;
                         }
                         dataIndex += receivedBytesCount;
                         if (dataIndex != dataBuffer.Length)
@@ -242,17 +241,18 @@ namespace jNet.RPC
                 }
                 catch (OperationCanceledException)
                 {
-                    return;
+                    break;
                 }
                 catch (Exception e) when (e is IOException || e is ObjectDisposedException || e is SocketException)
                 {
                     Shutdown();
-                    return;
+                    break;
                 }
                 catch (Exception e)
                 {
+                    Logger.Error(e, "Read thread unexpected exception. Data buffer was {0}", dataBuffer is null ? "null" : BitConverter.ToString(dataBuffer));
                     Shutdown();
-                    Logger.Error(e, "Read thread unexpected exception");
+                    break;
                 }
             }
         }
@@ -266,7 +266,7 @@ namespace jNet.RPC
         {
             var serialized = new MemoryStream();
             using (var writer = new StreamWriter(serialized, Encoding.UTF8, 1024, true))
-                Serializer.Serialize(writer, eventArgs);
+                _serializer.Serialize(writer, eventArgs);
             return serialized;
 
         }
@@ -287,7 +287,7 @@ namespace jNet.RPC
                 return null;
             var serialized = new MemoryStream();
             using (var writer = new StreamWriter(serialized, Encoding.UTF8, 1024, true))
-                Serializer.Serialize(writer, dto);
+                _serializer.Serialize(writer, dto);
 
             return serialized;
         }
@@ -298,7 +298,7 @@ namespace jNet.RPC
                 return default(T);
             using (var reader = new StreamReader(stream))
             {
-                return (T)Serializer.Deserialize(reader, typeof(T));
+                return (T)_serializer.Deserialize(reader, typeof(T));
             }
         }
     }

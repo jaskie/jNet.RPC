@@ -44,11 +44,13 @@ namespace jNet.RPC.Client
             GC.ReRegisterForFinalize(this);
         }
 
-        public Guid DtoGuid { get; internal set; }        
+        internal int IsFinalizeRequested => _isFinalizeRequested;
+
+        public Guid DtoGuid { get; internal set; }
 
         public event PropertyChangedEventHandler PropertyChanged;
        
-        internal event EventHandler Finalized;        
+        internal event EventHandler Finalized;
 
         protected T Get<T>([CallerMemberName] string propertyName = null)
         {

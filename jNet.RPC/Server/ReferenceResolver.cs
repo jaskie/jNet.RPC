@@ -10,7 +10,7 @@ namespace jNet.RPC.Server
 {
     internal class ReferenceResolver : IReferenceResolver, IDisposable
     {
-        private readonly Dictionary<Guid, ServerObjectBase> _knownDtos = new Dictionary<Guid, ServerObjectBase>();        
+        private readonly Dictionary<Guid, ServerObjectBase> _knownDtos = new Dictionary<Guid, ServerObjectBase>();
         public readonly object Sync = new object();
         private int _disposed;
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
@@ -151,6 +151,9 @@ namespace jNet.RPC.Server
 
 
         internal event EventHandler<WrappedEventArgs> ReferencePropertyChanged;
+
+        // for running tests only
+        internal Dictionary<Guid, ServerObjectBase> KnownDtos => _knownDtos;
 
         private void Dto_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {

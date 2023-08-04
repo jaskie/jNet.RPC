@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 
@@ -9,28 +10,21 @@ namespace jNet.RPC
         public enum SocketMessageType: byte
         {
             RootQuery,
-            Query,
-            Get,
-            Set,
+            MethodExecute,
+            PropertyGet,
+            PropertySet,
             EventAdd,
             EventRemove,
             EventNotification,
-            ProxyFinalized,       
+            ProxyFinalized,
             ProxyResurrected,
             ProxyMissing,
-            Exception,            
+            Exception,
         }
-
-        private static readonly byte[] Version = { 0x1, 0x0,
-#if DEBUG
-            0x1
-#else
-            0x0
-#endif
-        };
 
         private readonly byte[] _rawData;
         private readonly int _valueStartIndex;
+        private static readonly byte[] ContentLengthPlaceholder = new byte[sizeof(uint)] { 0, 0, 0, 0 };
 
         internal SocketMessage(object value = null)
         {
@@ -50,9 +44,6 @@ namespace jNet.RPC
         internal SocketMessage(byte[] rawData)
         {
             var index = 0;
-            var version = new byte[Version.Length];
-            Buffer.BlockCopy(rawData, index, version, 0, version.Length);
-            index += version.Length;
             MessageType = (SocketMessageType) rawData[index];
             index += 1;
             byte[] guidBuffer = new byte[16];
@@ -62,13 +53,14 @@ namespace jNet.RPC
             Buffer.BlockCopy(rawData, index, guidBuffer, 0, guidBuffer.Length);
             index += guidBuffer.Length;
             DtoGuid = new Guid(guidBuffer);
-            var stringLength = BitConverter.ToInt32(rawData, index);
+            var memberNameLength = BitConverter.ToInt32(rawData, index);
             index += sizeof(int);
-            MemberName = Encoding.ASCII.GetString(rawData, index, stringLength);
-            index += stringLength;
+            MemberName = Encoding.ASCII.GetString(rawData, index, memberNameLength);
+            index += memberNameLength;
             ParametersCount = BitConverter.ToInt32(rawData, index);
             _valueStartIndex = index + sizeof(int);
             _rawData = rawData;
+            Debug.Assert(_valueStartIndex == 41 + memberNameLength, "There are 41 bytes and MemberName string before value starts");
         }
 
         public object Value { get; }
@@ -106,9 +98,7 @@ namespace jNet.RPC
         {
             using (var stream = new MemoryStream())
             {
-                stream.Write(new byte[]{0, 0, 0, 0}, 0, sizeof(int)); // content length placeholder
-
-                stream.Write(Version, 0, Version.Length);
+                stream.Write(ContentLengthPlaceholder, 0, sizeof(uint));
 
                 stream.WriteByte((byte)MessageType);
 
@@ -121,9 +111,9 @@ namespace jNet.RPC
                     stream.Write(BitConverter.GetBytes(0), 0, sizeof(int));
                 else
                 {
-                    byte[] memberName = Encoding.ASCII.GetBytes(MemberName);
-                    stream.Write(BitConverter.GetBytes(memberName.Length), 0, sizeof(int));
-                    stream.Write(memberName, 0, memberName.Length);
+                    byte[] memberNameBytes = Encoding.ASCII.GetBytes(MemberName);
+                    stream.Write(BitConverter.GetBytes(memberNameBytes.Length), 0, sizeof(int));
+                    stream.Write(memberNameBytes, 0, memberNameBytes.Length);
                 }
                 stream.Write(BitConverter.GetBytes(ParametersCount), 0, sizeof(int));
                 if (value != null)
@@ -131,21 +121,22 @@ namespace jNet.RPC
                     value.Position = 0;
                     value.CopyTo(stream);
                 }
-                var contentLength = BitConverter.GetBytes((int)stream.Length - sizeof(int));
+                var contentLength = BitConverter.GetBytes((uint)stream.Length - sizeof(uint));
                 stream.Position = 0;
-                stream.Write(contentLength, 0, sizeof(int));
+                stream.Write(contentLength, 0, ContentLengthPlaceholder.Length);
                 return stream.ToArray();
             }
         }
 
-        public Stream ValueStream => _rawData.Length > _valueStartIndex ? new MemoryStream(_rawData, _valueStartIndex, _rawData.Length - _valueStartIndex) : null;
-        
+        public Stream GetValueStream() => _rawData.Length > _valueStartIndex ? new MemoryStream(_rawData, _valueStartIndex, _rawData.Length - _valueStartIndex) : null;
+
+#if DEBUG
         public string ValueString => Encoding.UTF8.GetString(_rawData, _valueStartIndex, _rawData.Length - _valueStartIndex);
+#endif
     }
 
     public class SocketMessageArrayValue 
     {
-        //[DtoField(TypeNameHandling = TypeNameHandling.Arrays, ItemTypeNameHandling = TypeNameHandling.Objects | TypeNameHandling.Arrays)]
         [DtoMember]
         public object[] Value;
     }
