@@ -68,7 +68,6 @@
     <Compile Include="Client\ReferenceResolver.cs" />
     <Compile Include="Client\ClientSession.cs" />
     <Compile Include="Client\MessageRequest.cs" />
-    <Compile Include="Client\ProxyObjectBaseEventArgs.cs" />
     <Compile Include="Client\SerializationBinder.cs" />
     <Compile Include="DtoTypeAttribute.cs" />
     <Compile Include="DtoMemberAttribute.cs" />

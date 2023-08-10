@@ -28,7 +28,7 @@ namespace jNet.RPC.Server
                 return;
 
             lock(Sync)
-            {                
+            {
                 foreach (var key in _knownDtos.Keys.ToList())
                 {
                     if (!_knownDtos.TryGetValue(key, out var removed))
@@ -36,7 +36,7 @@ namespace jNet.RPC.Server
                     removed.PropertyChanged -= Dto_PropertyChanged;
                     _knownDtos.Remove(key);
                 }
-            }            
+            }
         }
 
         #region IReferenceResolver
@@ -126,7 +126,6 @@ namespace jNet.RPC.Server
                 _knownDtos.Add(dto.DtoGuid, dto);
                 Logger.Trace("Object ressurection acknowledged {0}", dto.DtoGuid);
             }
-            
             return true;
         }
 

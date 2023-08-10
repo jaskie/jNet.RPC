@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json.Serialization;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -18,16 +19,15 @@ namespace jNet.RPC.Server
         private readonly IPrincipal _sessionUser;
         private readonly IPEndPoint _remoteAddress;
         private readonly IDto _initialObject;
-        private readonly ReferenceResolver _referenceResolver;
+        private readonly ReferenceResolver _referenceResolver = new ReferenceResolver();
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
-        public ServerSession(TcpClient client, IDto initialObject, IPrincipal sessionUser): base(client, new ReferenceResolver())
+        public ServerSession(TcpClient client, IDto initialObject, IPrincipal sessionUser): base(client)
         {
             _remoteAddress = client.Client.RemoteEndPoint as IPEndPoint ?? throw new ArgumentException("Client RemoteEndpoint is invalid");
             _sessionUser = sessionUser;
             Serializer.SerializationBinder = new SerializationBinder();
             _initialObject = initialObject;
-            _referenceResolver = ReferenceResolver as ReferenceResolver ?? throw new ApplicationException("Invalid reference resolver");                
             Logger.Info("Remote {0} from {1} successfully connected", _sessionUser.Identity, _remoteAddress);
             _referenceResolver.ReferencePropertyChanged += ReferenceResolver_ReferencePropertyChanged;
             StartThreads();
@@ -39,6 +39,8 @@ namespace jNet.RPC.Server
             Debug.WriteLine("Finalized: {0} for {1}", this, _initialObject);
         }
 #endif
+
+        protected override IReferenceResolver GetReferenceResolver() => _referenceResolver;
 
         protected override void ReadThreadProc()
         {
@@ -74,7 +76,7 @@ namespace jNet.RPC.Server
                         continue;
                     }
                     // method of particular object
-                    var objectToInvoke = ((ReferenceResolver)ReferenceResolver).ResolveReference(message.DtoGuid);
+                    var objectToInvoke = _referenceResolver.ResolveReference(message.DtoGuid);
                     if (objectToInvoke != null)
                     {
                         switch (message.MessageType)

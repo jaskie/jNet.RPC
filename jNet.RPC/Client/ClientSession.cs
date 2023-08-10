@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json.Serialization;
+using System;
 using System.Collections.Concurrent;
 using System.IO;
 
@@ -8,45 +9,40 @@ namespace jNet.RPC.Client
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();       
         private readonly ConcurrentDictionary<Guid, MessageRequest> _requests = new ConcurrentDictionary<Guid, MessageRequest>();
-        private readonly ReferenceResolver _referenceResolver;
+        private readonly ReferenceResolver _referenceResolver = new ReferenceResolver();
         private readonly NotificationExecutor _notificationExecutor;
 
-        public ClientSession(string address) : base(address, new ReferenceResolver())
+        public ClientSession(string address) : base(address)
         {
-            _referenceResolver = ReferenceResolver as ReferenceResolver ?? throw new ApplicationException("Invalid reference resolver");
-            _referenceResolver.ReferenceFinalized += Resolver_ReferenceFinalized;
-            _referenceResolver.ReferenceResurected += Resolver_ReferenceResurrected;
-            _referenceResolver.OnReferenceMissing = Resolver_ReferenceMissing;
+            _referenceResolver.SetCallbacks(Resolver_ReferenceFinalized, Resolver_ReferenceResurrected,  Resolver_ReferenceMissing);
             _notificationExecutor = new NotificationExecutor();
             StartThreads();
         }
 
+        protected override IReferenceResolver GetReferenceResolver() => _referenceResolver;
 
         protected override void OnDispose()
         {
-            base.OnDispose();
-            _referenceResolver.ReferenceFinalized -= Resolver_ReferenceFinalized;
-            _referenceResolver.ReferenceResurected -= Resolver_ReferenceResurrected;
-            _referenceResolver.OnReferenceMissing = null;
             _referenceResolver.Dispose();
             _notificationExecutor.Dispose();
+            base.OnDispose();
         }
 
-        private void Resolver_ReferenceFinalized(object sender, ProxyObjectBaseEventArgs e)
+        private void Resolver_ReferenceFinalized(ProxyObjectBase proxy)
         {
             Send(SocketMessage.Create(
                 SocketMessage.SocketMessageType.ProxyFinalized,
-                e.Proxy,
+                proxy,
                 string.Empty,
                 0,
                 null));
         }
 
-        private void Resolver_ReferenceResurrected(object sender, ProxyObjectBaseEventArgs e)
+        private void Resolver_ReferenceResurrected(ProxyObjectBase proxy)
         {
             Send(SocketMessage.Create(
                 SocketMessage.SocketMessageType.ProxyResurrected,
-                e.Proxy,
+                proxy,
                 string.Empty,
                 0,
                 null));
@@ -157,7 +153,7 @@ namespace jNet.RPC.Client
                         var obj = (T)Serializer.Deserialize(reader, typeof(T));
                         if (obj is ProxyObjectBase target)
                         {
-                            var source = ((ReferenceResolver)ReferenceResolver).TakeProxyToPopulate(target.DtoGuid);
+                            var source = _referenceResolver.TakeProxyToPopulate(target.DtoGuid);
                             if (source == null)
                                 return obj;
                             try

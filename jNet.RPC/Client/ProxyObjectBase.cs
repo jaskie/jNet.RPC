@@ -22,19 +22,19 @@ namespace jNet.RPC.Client
             if (Interlocked.Exchange(ref _isDisposed, 1) == default)
                 DoDispose();
         }
-        
+
         ~ProxyObjectBase()
         {
             if (Interlocked.Exchange(ref _isFinalizeRequested, 1) == default) //first finalization will send request to server; on response hard reference will be deleted and object collected in next GC run
             {
-                
+
                 Finalized?.Invoke(this, EventArgs.Empty);
                 GC.ReRegisterForFinalize(this);
             }
             else
             {
                 Logger.Trace("Proxy {0} finalized", DtoGuid);
-            }                
+            }
         }
 
         internal void Resurect()

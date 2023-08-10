@@ -14,11 +14,28 @@ namespace jNet.RPC.Client
         private int _disposed;
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
+        private Action<ProxyObjectBase> _onReferenceFinalized;
+        private Action<ProxyObjectBase> _onReferenceResurected;
+        private Func<Guid, IDto> _onReferenceMissing;
+
+        public void SetCallbacks(Action<ProxyObjectBase> onReferenceFinalized, Action<ProxyObjectBase> onReferenceResurected, Func<Guid, IDto> onReferenceMissing)
+        {
+            _onReferenceFinalized = onReferenceFinalized;
+            _onReferenceResurected = onReferenceResurected;
+            _onReferenceMissing = onReferenceMissing;
+        }
+
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _disposed, 1) != default)
                 return;
-            _knownDtos.Clear();
+            _onReferenceFinalized = null;
+            _onReferenceResurected = null;
+            _onReferenceMissing = null;
+            lock (((IDictionary)_knownDtos).SyncRoot)
+            {
+                _knownDtos.Clear();
+            }
         }
 
         #region IReferenceResolver
@@ -46,12 +63,11 @@ namespace jNet.RPC.Client
 
         public string GetReference(object context, object value)
         {
-            if (!(value is ProxyObjectBase proxy)) 
+            if (!(value is ProxyObjectBase proxy))
                 return string.Empty;
 
             return proxy.DtoGuid.ToString();
         }
-
 
         public bool IsReferenced(object context, object value)
         {
@@ -81,14 +97,10 @@ namespace jNet.RPC.Client
             if (TryResurect(id, out proxy))
                 return proxy;
             Logger.Debug("Unknown reference: {0}, querying server", reference);
-            return OnReferenceMissing?.Invoke(id);
+            return _onReferenceMissing?.Invoke(id);
         }
 
         #endregion //IReferenceResolver
-
-        internal event EventHandler<ProxyObjectBaseEventArgs> ReferenceFinalized;
-        internal event EventHandler<ProxyObjectBaseEventArgs> ReferenceResurected;
-        internal Func<Guid, IDto> OnReferenceMissing;
 
         internal ProxyObjectBase ResolveReference(Guid reference)
         {
@@ -135,15 +147,17 @@ namespace jNet.RPC.Client
             }
             lock (((IDictionary)_knownDtos).SyncRoot)
                 _knownDtos.Add(proxy.DtoGuid, new WeakReference<ProxyObjectBase>(proxy, true));
-            ReferenceResurected?.Invoke(this, new ProxyObjectBaseEventArgs(proxy));
+            _onReferenceResurected?.Invoke(proxy);
             proxy.Resurect();
             Logger.Debug("Resurected proxy {0} with {1}", dtoGuid, proxy);
             return true;
         }
 
         private void Proxy_Finalized(object sender, EventArgs e)
-        {            
+        {
             if (!(sender is ProxyObjectBase proxy))
+                return;
+            if (_disposed != default)
                 return;
             lock (((IDictionary)_finalizeRequested).SyncRoot)
             {
@@ -159,7 +173,7 @@ namespace jNet.RPC.Client
             {
                 Logger.Trace("Deleting from knowndtos {0}", proxy.DtoGuid);
                 _knownDtos.Remove(proxy.DtoGuid);
-                ReferenceFinalized?.Invoke(this, new ProxyObjectBaseEventArgs(proxy));
+                _onReferenceFinalized?.Invoke(proxy);
             }
         }
 

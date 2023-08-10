@@ -38,18 +38,16 @@ namespace jNet.RPC
 
         public TcpClient Client { get; private set; }
         internal JsonSerializer Serializer => _serializer;
-        protected readonly IReferenceResolver ReferenceResolver;
 
-        protected SocketConnection(TcpClient client, IReferenceResolver referenceResolver)
+        protected SocketConnection(TcpClient client)
         {
             Client = client;
             client.NoDelay = true;
-            ReferenceResolver = referenceResolver;
             _sendQueue = new BlockingCollection<byte[]>(0x100000);
             _serializer = JsonSerializer.CreateDefault(new JsonSerializerSettings
             {
                 ContractResolver = new SerializationContractResolver(),
-                ReferenceResolverProvider = () => referenceResolver,
+                ReferenceResolverProvider = GetReferenceResolver,
                 TypeNameHandling = TypeNameHandling.Objects,
                 Context = new StreamingContext(StreamingContextStates.Remoting),
 #if DEBUG
@@ -61,15 +59,14 @@ namespace jNet.RPC
             _messageHandlerThread = CreateThread(MessageHandlerProc, $"jNet.RPC message handler thread for {Client.Client.RemoteEndPoint}");
         }
 
-        protected SocketConnection(string address, IReferenceResolver referenceResolver)
+        protected SocketConnection(string address)
         {
-            ReferenceResolver = referenceResolver;
             _sendQueue = new BlockingCollection<byte[]>(MessageQueueCapacity);
             _serializer = JsonSerializer.CreateDefault(new JsonSerializerSettings
             {
                 ContractResolver = new SerializationContractResolver(),
                 Context = new StreamingContext(StreamingContextStates.Remoting, this),
-                ReferenceResolverProvider = () => referenceResolver,
+                ReferenceResolverProvider = GetReferenceResolver,
                 TypeNameHandling = TypeNameHandling.Objects | TypeNameHandling.Arrays,
 #if DEBUG
                 Formatting = Formatting.Indented
@@ -98,6 +95,8 @@ namespace jNet.RPC
             _writeThread = CreateThread(WriteThreadProc, $"jNet.RPC write thread for {address}");
             _messageHandlerThread = CreateThread(MessageHandlerProc, $"jNet.RPC message handler thread for {address}");
         }
+
+        protected abstract IReferenceResolver GetReferenceResolver();
 
         protected void Send(SocketMessage message)
         {
