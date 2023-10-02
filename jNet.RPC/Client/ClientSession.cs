@@ -30,7 +30,7 @@ namespace jNet.RPC.Client
 
         private void Resolver_ReferenceFinalized(ProxyObjectBase proxy)
         {
-            Send(SocketMessage.Create(
+            Send(new SocketMessage(
                 SocketMessage.SocketMessageType.ProxyFinalized,
                 proxy,
                 string.Empty,
@@ -40,7 +40,7 @@ namespace jNet.RPC.Client
 
         private void Resolver_ReferenceResurrected(ProxyObjectBase proxy)
         {
-            Send(SocketMessage.Create(
+            Send(new SocketMessage(
                 SocketMessage.SocketMessageType.ProxyResurrected,
                 proxy,
                 string.Empty,

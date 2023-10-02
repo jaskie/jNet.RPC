@@ -32,6 +32,16 @@ namespace jNet.RPC
             Value = value;
         }
 
+        internal SocketMessage (SocketMessageType socketMessageType, IDto dto, string memberName, int paramsCount, object value)
+        {
+            MessageGuid = Guid.NewGuid();
+            Value = value;
+            MessageType = socketMessageType;
+            DtoGuid = dto?.DtoGuid ?? Guid.Empty;
+            MemberName = memberName;
+            ParametersCount = paramsCount;
+        }
+
         internal SocketMessage(SocketMessage originalMessage, object value)
         {
             MessageGuid = originalMessage.MessageGuid;
@@ -82,19 +92,8 @@ namespace jNet.RPC
         {
             return $"{MessageGuid}:{MessageType}:{MemberName} for {DtoGuid}";
         }
-        
-        public static SocketMessage Create(SocketMessageType SocketMessageType, IDto dto, string memberName, int paramsCount, object value)
-        {
-            return new SocketMessage(value)
-            {
-                MessageType = SocketMessageType,
-                DtoGuid = dto?.DtoGuid ?? Guid.Empty,
-                MemberName = memberName,
-                ParametersCount = paramsCount
-            };
-        }
 
-        public byte[] Encode(Stream value)
+        internal byte[] Encode(Stream value)
         {
             using (var stream = new MemoryStream())
             {

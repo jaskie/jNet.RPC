@@ -302,8 +302,8 @@ namespace jNet.RPC
         protected T DeserializeDto<T>(Stream stream)
         {
             if (stream == null)
-                return default(T);
-            using (var reader = new StreamReader(stream))
+                return default;
+            using (var reader = new StreamReader(stream, Encoding.UTF8))
             {
                 return (T)_serializer.Deserialize(reader, typeof(T));
             }
