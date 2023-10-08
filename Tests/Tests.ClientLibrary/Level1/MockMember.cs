@@ -34,7 +34,7 @@ namespace Tests.ClientLibrary.Level1
         }
 
         protected override void OnEventNotification(SocketMessage message)
-        {            
+        {
         }
     }
 }

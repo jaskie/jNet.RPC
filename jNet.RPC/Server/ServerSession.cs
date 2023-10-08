@@ -26,7 +26,7 @@ namespace jNet.RPC.Server
         {
             _remoteAddress = client.Client.RemoteEndPoint as IPEndPoint ?? throw new ArgumentException("Client RemoteEndpoint is invalid");
             _sessionUser = sessionUser;
-            Serializer.SerializationBinder = new SerializationBinder();
+            _serializer.SerializationBinder = new SerializationBinder();
             _initialObject = initialObject;
             Logger.Info("Remote {0} from {1} successfully connected", _sessionUser.Identity, _remoteAddress);
             _referenceResolver.ReferencePropertyChanged += ReferenceResolver_ReferencePropertyChanged;
@@ -88,7 +88,7 @@ namespace jNet.RPC.Server
                                                          m.GetParameters().Length == message.ParametersCount);
                                 if (methodToInvoke != null)
                                 {
-                                    var parameters = DeserializeDto<SocketMessageArrayValue>(message.GetValueStream());
+                                    var parameters = DeserializeValue<SocketMessageArrayValue>(message);
                                     var methodParameters = methodToInvoke.GetParameters();
                                     for (var i = 0; i < methodParameters.Length; i++)
                                         MethodParametersAlignment.AlignType(ref parameters.Value[i],
@@ -133,7 +133,7 @@ namespace jNet.RPC.Server
                                 var setProperty = objectToInvoke.GetType().GetProperty(message.MemberName);
                                 if (setProperty != null)
                                 {
-                                    var parameter = DeserializeDto<object>(message.GetValueStream());
+                                    var parameter = DeserializeValue<object>(message);
                                     MethodParametersAlignment.AlignType(ref parameter, setProperty.PropertyType);
                                     try
                                     {

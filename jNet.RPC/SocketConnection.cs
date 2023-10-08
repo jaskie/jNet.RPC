@@ -33,12 +33,11 @@ namespace jNet.RPC
         private readonly Thread _readThread;
         private readonly Thread _writeThread;
         private readonly Thread _messageHandlerThread;
-        private readonly JsonSerializer _serializer;
         protected readonly CancellationTokenSource DisconnectTokenSource = new CancellationTokenSource();
         private CancellationTokenRegistration _disconnectTokenRegistration;
 
         public TcpClient Client { get; private set; }
-        internal JsonSerializer Serializer => _serializer;
+        protected JsonSerializer _serializer;
 
         protected SocketConnection(TcpClient client)
         {
@@ -105,10 +104,8 @@ namespace jNet.RPC
                 return;
             try
             {
-                var serializedData = message.MessageType == SocketMessage.SocketMessageType.EventNotification
-                    ? SerializeEventArgs(message.Value)
-                    : SerializeDto(message.Value);
-                if (!_sendQueue.TryAdd(message.Encode(serializedData)))
+                var serializedData = SerializeEncodeMessage(message);
+                if (!_sendQueue.TryAdd(serializedData))
                 {
                     Logger.Error("Message queue overflow with message {0}", message);
                     Shutdown();
@@ -269,15 +266,6 @@ namespace jNet.RPC
             return _receiveQueue.Take(DisconnectTokenSource.Token);
         }
 
-        private Stream SerializeEventArgs(object eventArgs)
-        {
-            var serialized = new MemoryStream();
-            using (var writer = new StreamWriter(serialized, Encoding.UTF8, 1024, true))
-                _serializer.Serialize(writer, eventArgs);
-            return serialized;
-
-        }
-
         private Thread CreateThread(ThreadStart threadStart, string threadName)
         {
             return  new Thread(threadStart)
@@ -288,24 +276,26 @@ namespace jNet.RPC
             };
         }
 
-        protected Stream SerializeDto(object dto)
+        private byte[] SerializeEncodeMessage(SocketMessage message)
         {
-            if (dto == null)
-                return null;
-            var serialized = new MemoryStream();
-            using (var writer = new StreamWriter(serialized, Encoding.UTF8, 1024, true))
-                _serializer.Serialize(writer, dto);
-
-            return serialized;
+            using (var serialized = new MemoryStream())
+            {
+                using (var writer = new StreamWriter(serialized, Encoding.UTF8, 1024, true))
+                {
+                    _serializer.Serialize(writer, message.Value);
+                }
+                return message.Encode(serialized);
+            }
         }
 
-        protected T DeserializeDto<T>(Stream stream)
+        protected T DeserializeValue<T>(SocketMessage message)
         {
-            if (stream == null)
-                return default;
-            using (var reader = new StreamReader(stream, Encoding.UTF8))
+            using (var stream = message.GetValueStream())
             {
-                return (T)_serializer.Deserialize(reader, typeof(T));
+                if (stream is null)
+                    return default(T);
+                using (var reader = new StreamReader(stream, false))
+                    return (T)_serializer.Deserialize(reader, typeof(T));
             }
         }
     }

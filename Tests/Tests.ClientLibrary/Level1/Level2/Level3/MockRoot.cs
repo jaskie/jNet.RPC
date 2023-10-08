@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using Tests.CommonLibrary;
 
 namespace Tests.ClientLibrary.Level1.Level2.Level3
-{    
+{
     public class MockRoot : ProxyObjectBase, IMockRoot
     {
 #pragma warning disable CS0649
@@ -20,7 +20,7 @@ namespace Tests.ClientLibrary.Level1.Level2.Level3
         public List<IMockMember> Members => _members;
         public string SimpleProperty { get => _simpleProperty; set => Set(value); }
         protected override void OnEventNotification(SocketMessage message)
-        {            
+        {
         }
     }
 }

@@ -4,7 +4,7 @@ using System;
 using Tests.CommonLibrary;
 
 namespace Tests.ClientLibrary.Level1.Level2.Level3
-{   
+{
     public class MockMember : ProxyObjectBase, IMockMember
     {
 #pragma warning disable CS0649
@@ -33,7 +33,7 @@ namespace Tests.ClientLibrary.Level1.Level2.Level3
         }
 
         protected override void OnEventNotification(SocketMessage message)
-        {            
+        {
         }
     }
 }

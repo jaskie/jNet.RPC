@@ -20,7 +20,7 @@ namespace Tests.ClientLibrary
         public List<IMockMember> Members => _members;
         public string SimpleProperty { get => _simpleProperty; set => Set(value); }
         protected override void OnEventNotification(SocketMessage message)
-        {            
+        {
         }
     }
 }

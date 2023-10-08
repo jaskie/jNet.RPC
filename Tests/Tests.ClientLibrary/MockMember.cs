@@ -33,7 +33,7 @@ namespace Tests.ClientLibrary
         }
 
         protected override void OnEventNotification(SocketMessage message)
-        {            
+        {
         }
     }
 }

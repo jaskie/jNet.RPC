@@ -10,17 +10,17 @@ namespace jNet.RPC.Client
 
         public RemoteClient(string address) : base(address)
         {
-            Serializer.SerializationBinder = new SerializationBinder();
+            _serializer.SerializationBinder = new SerializationBinder();
         }
 
         public RemoteClient(string address, ISerializationBinder serializationBinder) : base(address)
         {
-            Serializer.SerializationBinder = serializationBinder;
+            _serializer.SerializationBinder = serializationBinder;
         }
 
         public void AddProxyAssembly(Assembly assembly)
         {
-            var binder = Serializer.SerializationBinder as SerializationBinder ?? throw new ApplicationException($"SerializationBinder is not {typeof(SerializationBinder)}");
+            var binder = _serializer.SerializationBinder as SerializationBinder ?? throw new ApplicationException($"SerializationBinder is not {typeof(SerializationBinder)}");
             binder.AddProxyAssembly(assembly);
         }
 
@@ -29,7 +29,7 @@ namespace jNet.RPC.Client
             try
             {
                 var queryMessage = new SocketMessage(SocketMessage.SocketMessageType.RootQuery, null, null, 0, null);
-                var response = SendAndGetResponse<T>(queryMessage);                
+                var response = SendAndGetResponse<T>(queryMessage);
                 return response;
             }
             catch (Exception e)
@@ -49,7 +49,7 @@ namespace jNet.RPC.Client
                     methodName,
                     parameters.Length,
                     new SocketMessageArrayValue { Value = parameters });
-                return SendAndGetResponse<T>(queryMessage);                
+                return SendAndGetResponse<T>(queryMessage);
             }
             catch (Exception e)
             {

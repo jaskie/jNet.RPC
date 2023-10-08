@@ -7,19 +7,6 @@ namespace jNet.RPC
 {
     internal static class MethodParametersAlignment
     {
-        public static T AlignType<T>(this JsonSerializer serializer, object input)
-        {
-            if (input == null)
-                return default(T);
-            if (input is JArray)
-                using (var reader = new StringReader(input.ToString()))
-                {
-                    return (T)serializer.Deserialize(reader, typeof(T));
-                }
-            AlignType(ref input, typeof(T));
-            return (T)input;
-        }
-
         public static void AlignType(ref object input, Type type)
         {
             if (type.IsEnum)

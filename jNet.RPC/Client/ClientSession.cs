@@ -7,14 +7,14 @@ namespace jNet.RPC.Client
 {
     public abstract class ClientSession : SocketConnection
     {
-        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();       
+        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private readonly ConcurrentDictionary<Guid, MessageRequest> _requests = new ConcurrentDictionary<Guid, MessageRequest>();
         private readonly ReferenceResolver _referenceResolver = new ReferenceResolver();
         private readonly NotificationExecutor _notificationExecutor;
 
         public ClientSession(string address) : base(address)
         {
-            _referenceResolver.SetCallbacks(Resolver_ReferenceFinalized, Resolver_ReferenceResurrected,  Resolver_ReferenceMissing);
+            _referenceResolver.SetCallbacks(Resolver_ReferenceFinalized, Resolver_ReferenceResurrected, Resolver_ReferenceMissing);
             _notificationExecutor = new NotificationExecutor();
             StartThreads();
         }
@@ -146,28 +146,26 @@ namespace jNet.RPC.Client
             {
                 if (valueStream == null)
                     return default;
-
-                lock (this)
-                    using (var reader = new StreamReader(valueStream))
+                using (var reader = new StreamReader(valueStream, false))
+                {
+                    var obj = (T)_serializer.Deserialize(reader, typeof(T));
+                    if (obj is ProxyObjectBase target)
                     {
-                        var obj = (T)Serializer.Deserialize(reader, typeof(T));
-                        if (obj is ProxyObjectBase target)
+                        var source = _referenceResolver.TakeProxyToPopulate(target.DtoGuid);
+                        if (source == null)
+                            return obj;
+                        try
                         {
-                            var source = _referenceResolver.TakeProxyToPopulate(target.DtoGuid);
-                            if (source == null)
-                                return obj;
-                            try
-                            {
-                                reader.BaseStream.Position = 0;
-                                Serializer.Populate(reader, target);
-                            }
-                            catch (Exception ex)
-                            {
-                                Logger.Error(ex, "Error when populating {0}:{1}", source.DtoGuid, target.DtoGuid);
-                            }
+                            reader.BaseStream.Position = 0;
+                            _serializer.Populate(reader, target);
                         }
-                        return obj;
+                        catch (Exception ex)
+                        {
+                            Logger.Error(ex, "Error when populating {0}:{1}", source.DtoGuid, target.DtoGuid);
+                        }
                     }
+                    return obj;
+                }
             }
         }
     }

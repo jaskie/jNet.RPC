@@ -33,7 +33,7 @@ namespace jNet.RPC.Client
             var attributes = assembly.GetCustomAttributes<ProxyNamespaceAttribute>();
             foreach (var attribute in attributes)
                 _assemblyNamespaceMappings.Add(new AssemblyNamespaceMapping(assembly, attribute.ServerNamespace, attribute.ClientNamespace));
-        }         
+        }
 
         public Type BindToType(string assemblyName, string typeName)
         {
@@ -89,6 +89,5 @@ namespace jNet.RPC.Client
             typeName = serializedType.FullName;
             assemblyName = serializedType.Assembly.GetName().Name;
         }
-        
     }
 }

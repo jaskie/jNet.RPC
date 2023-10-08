@@ -26,7 +26,7 @@ namespace ClientApp
             var config = new LoggingConfiguration();
             var debuggerTarget = new DebuggerTarget("debugger")
             {
-                Layout = @"${date:format=HH\:mm\:ss} ${level} ${message} ${exception}"
+                Layout = @"${date:format=HH\:mm\:ss} ${logger} ${level} ${message} ${exception}"
             };
             config.AddTarget(debuggerTarget);
             config.AddRuleForAllLevels(debuggerTarget);
