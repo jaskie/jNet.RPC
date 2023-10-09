@@ -62,7 +62,7 @@ namespace jNet.RPC.Client
             return result;
         }
 
-        protected void Set<T>(T value, [CallerMemberName] string propertyName = null)
+        protected internal void Set<T>(T value, [CallerMemberName] string propertyName = null)
         {
             if (_isDisposed != default)
                 return;
@@ -77,21 +77,21 @@ namespace jNet.RPC.Client
             _client.Set(this, value, propertyName);
         }
 
-        protected void Invoke([CallerMemberName] string methodName = null, params object[] parameters)
+        protected internal void Invoke([CallerMemberName] string methodName = null, params object[] parameters)
         {
             if (_isDisposed != default)
                 return;
             _client.Invoke(this, methodName, parameters);
         }
 
-        protected T Query<T>([CallerMemberName] string methodName = null, params object[] parameters)
+        protected internal T Query<T>([CallerMemberName] string methodName = null, params object[] parameters)
         {
             if (_isDisposed != default)
                 return default;
             return _client.Query<T>(this, methodName, parameters);
         }
 
-        protected void EventAdd<T>(T handler, [CallerMemberName] string eventName = null)
+        protected internal void EventAdd<T>(T handler, [CallerMemberName] string eventName = null)
         {
             if (_isDisposed != default)
                 return;
@@ -99,7 +99,7 @@ namespace jNet.RPC.Client
                 _client?.EventAdd(this, eventName);
         }
 
-        protected void EventRemove<T>(T handler, [CallerMemberName] string eventName = null)
+        protected internal void EventRemove<T>(T handler, [CallerMemberName] string eventName = null)
         {
             if (_isDisposed != default)
                 return;
@@ -109,7 +109,7 @@ namespace jNet.RPC.Client
             }
         }
 
-        protected abstract void OnEventNotification(SocketMessage message);
+        protected internal abstract void OnEventNotification(SocketMessage message);
 
         protected void NotifyPropertyChanged(string propertyName)
         {
@@ -127,11 +127,9 @@ namespace jNet.RPC.Client
             _client = (RemoteClient)context.Context;
         }
 
-        protected T Deserialize<T>(SocketMessage message)
+        protected internal T DeserializeEventArgs<T>(SocketMessage message) where T: EventArgs
         {
-            if (_client == null)
-                return default;
-            return _client.Deserialize<T>(message);
+            return _client?.Deserialize<T>(message);
         }
 
         internal void OnNotificationMessage(SocketMessage message)
@@ -139,7 +137,7 @@ namespace jNet.RPC.Client
             Logger.Trace("On NotificationMessage {0}", message);
             if (message.MemberName == nameof(INotifyPropertyChanged.PropertyChanged))
             {
-                var eav = Deserialize<PropertyChangedWithValueEventArgs>(message);
+                var eav = DeserializeEventArgs<PropertyChangedWithValueEventArgs>(message);
                 if (eav == null)
                     return;
                 var type = GetType();

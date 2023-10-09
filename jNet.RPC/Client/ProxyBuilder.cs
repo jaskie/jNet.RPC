@@ -47,9 +47,9 @@ namespace jNet.RPC.Client
 
         private void AddMethodOnEventNotification(TypeBuilder typeBuilder, EventInfo[] events, FieldInfo[] eventFields)
         {
-            var originalMethod = _proxyBaseType.GetMethod("OnEventNotification", BindingFlags.Instance | BindingFlags.NonPublic);
+            var originalMethod = _proxyBaseType.GetMethod(nameof(ProxyObjectBase.OnEventNotification), BindingFlags.Instance | BindingFlags.NonPublic);
             var method = typeBuilder.DefineMethod(originalMethod.Name, MethodAttributes.Virtual | MethodAttributes.Family, typeof(void), new Type[] { typeof(SocketMessage) });
-            var deserializeMethod = _proxyBaseType.GetMethod("Deserialize", BindingFlags.Instance | BindingFlags.NonPublic);
+            var deserializeMethod = _proxyBaseType.GetMethod(nameof(ProxyObjectBase.DeserializeEventArgs), BindingFlags.Instance | BindingFlags.NonPublic);
             var stringEquals = typeof(string).GetMethod(nameof(string.Equals), BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(string), typeof(string) }, null);
             var parameter = method.DefineParameter(0, ParameterAttributes.In, "message");
             var socketMessage_MemberNameField = typeof(SocketMessage).GetField(nameof(SocketMessage.MemberName));
@@ -127,7 +127,7 @@ namespace jNet.RPC.Client
             {
                 var setterMethodBuilder = typeBuilder.DefineMethod(property.GetSetMethod().Name, MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig | MethodAttributes.NewSlot | MethodAttributes.Final | MethodAttributes.SpecialName);
                 setterMethodBuilder.SetParameters(property.PropertyType);
-                var setterMethod = typeBuilder.BaseType.GetMethod("Set", BindingFlags.Instance | BindingFlags.NonPublic).MakeGenericMethod(property.PropertyType);
+                var setterMethod = typeBuilder.BaseType.GetMethod(nameof(ProxyObjectBase.Set), BindingFlags.Instance | BindingFlags.NonPublic).MakeGenericMethod(property.PropertyType);
                 var ilGen = setterMethodBuilder.GetILGenerator();
                 ilGen.Emit(OpCodes.Ldarg_0);
                 ilGen.Emit(OpCodes.Ldarg_1);
@@ -165,8 +165,8 @@ namespace jNet.RPC.Client
                 ilGen.Emit(OpCodes.Stelem_Ref);
             }
             var baseMethodToInvoke = method.ReturnType == typeof(void)
-                ? _proxyBaseType.GetMethod("Invoke", BindingFlags.Instance | BindingFlags.NonPublic)
-                : _proxyBaseType.GetMethod("Query", BindingFlags.Instance | BindingFlags.NonPublic).MakeGenericMethod(method.ReturnType);
+                ? _proxyBaseType.GetMethod(nameof(ProxyObjectBase.Invoke), BindingFlags.Instance | BindingFlags.NonPublic)
+                : _proxyBaseType.GetMethod(nameof(ProxyObjectBase.Query), BindingFlags.Instance | BindingFlags.NonPublic).MakeGenericMethod(method.ReturnType);
 
             ilGen.Emit(OpCodes.Call, baseMethodToInvoke);
             ilGen.Emit(OpCodes.Nop);
@@ -188,7 +188,7 @@ namespace jNet.RPC.Client
                 new[] { eventType });
             var addMethodGenerator = addMethod.GetILGenerator();
             var combine = typeof(Delegate).GetMethod(nameof(Delegate.Combine), new[] { typeof(Delegate), typeof(Delegate) });
-            var eventAddMethod = _proxyBaseType.GetMethod("EventAdd", BindingFlags.Instance | BindingFlags.NonPublic).MakeGenericMethod(eventType);
+            var eventAddMethod = _proxyBaseType.GetMethod(nameof(ProxyObjectBase.EventAdd), BindingFlags.Instance | BindingFlags.NonPublic).MakeGenericMethod(eventType);
             addMethodGenerator.Emit(OpCodes.Ldarg_0);
             addMethodGenerator.Emit(OpCodes.Ldarg_0);
             addMethodGenerator.Emit(OpCodes.Ldfld, field);
@@ -220,7 +220,7 @@ namespace jNet.RPC.Client
             removeMethodGenerator.Emit(OpCodes.Castclass, eventType);
             removeMethodGenerator.Emit(OpCodes.Stfld, field);
 
-            var eventRemoveMethod = _proxyBaseType.GetMethod("EventRemove", BindingFlags.Instance | BindingFlags.NonPublic).MakeGenericMethod(eventType);
+            var eventRemoveMethod = _proxyBaseType.GetMethod(nameof(ProxyObjectBase.EventRemove), BindingFlags.Instance | BindingFlags.NonPublic).MakeGenericMethod(eventType);
             removeMethodGenerator.Emit(OpCodes.Ldarg_0);
             removeMethodGenerator.Emit(OpCodes.Ldarg_0);
             removeMethodGenerator.Emit(OpCodes.Ldfld, field);
