@@ -10,9 +10,9 @@ namespace jNet.RPC.UnitTests.MockModel
 #pragma warning restore
         public string Value { get => _value; set => Set(value); }
 
-        protected override void OnEventNotification(SocketMessage message)
+        protected internal override void OnEventNotification(SocketMessage message)
         {
-            
+
         }
     }
 }

@@ -122,7 +122,7 @@ namespace jNet.RPC
             }
         }
 
-        public Stream GetValueStream() => _rawData.Length > _valueStartIndex ? new MemoryStream(_rawData, _valueStartIndex, _rawData.Length - _valueStartIndex) : null;
+        public MemoryStream GetValueStream() => _rawData.Length > _valueStartIndex ? new MemoryStream(_rawData, _valueStartIndex, _rawData.Length - _valueStartIndex) : null;
 
 #if DEBUG
         public string ValueString => Encoding.UTF8.GetString(_rawData, _valueStartIndex, _rawData.Length - _valueStartIndex);

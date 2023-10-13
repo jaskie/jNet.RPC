@@ -14,8 +14,8 @@ namespace jNet.RPC.IntegrationTests.Communication
         private static ServerHost _server;
         private static Tests.ServerLibrary.MockRoot _mockObject;
 
-        [ClassInitialize]
-        public static void SetUpServerClient(TestContext context)
+        [TestInitialize]
+        public void SetUpServerClient()
         {
             _mockObject = new Tests.ServerLibrary.MockRoot();
             
@@ -25,8 +25,8 @@ namespace jNet.RPC.IntegrationTests.Communication
             _client.AddProxyAssembly(typeof(Tests.ClientLibrary.MockRoot).Assembly);
         }
 
-        [ClassCleanup]
-        public static void CleanUp()
+        [TestCleanup]
+        public void CleanUp()
         {
             _client.Dispose();
             _server.Dispose();
@@ -37,8 +37,8 @@ namespace jNet.RPC.IntegrationTests.Communication
         {
             IMockRoot proxy = _client.GetRootObject<IMockRoot>();
             Assert.IsNotNull(proxy, "Returned object is null!");
-            Assert.IsTrue(proxy.SimpleProperty == _mockObject.SimpleProperty);
-            Assert.IsTrue(proxy.Members.Count == _mockObject.Members.Count);
+            Assert.AreEqual(_mockObject.SimpleProperty, proxy.SimpleProperty);
+            Assert.AreEqual(_mockObject.Members.Count, proxy.Members.Count);
         }
     }
 }

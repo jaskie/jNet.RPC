@@ -10,12 +10,13 @@ namespace jNet.RPC.IntegrationTests.Communication
     [TestClass]
     public class ResolvingProxyTypeTests
     {
+
         public static IEnumerable<object[]> GetLocalTestData()
         {
             yield return new object[] { new ServerHost(1024, new Tests.ServerLibrary.MockRoot()), new RemoteClient("127.0.0.1:1024"), typeof(Tests.ClientLibrary.MockRoot) };
             yield return new object[] { new ServerHost(1025, new Tests.ServerLibrary.Level1.MockRoot()), new RemoteClient("127.0.0.1:1025"), typeof(Tests.ClientLibrary.Level1.MockRoot) };
             yield return new object[] { new ServerHost(1026, new Tests.ServerLibrary.Level1.Level2.MockRoot()), new RemoteClient("127.0.0.1:1026"), typeof(Tests.ClientLibrary.Level1.Level2.MockRoot) };            
-        }        
+        }
 
         [TestMethod]
         [DynamicData(nameof(GetLocalTestData), DynamicDataSourceType.Method)]
@@ -25,11 +26,11 @@ namespace jNet.RPC.IntegrationTests.Communication
 
             var proxy = client.GetRootObject<IMockRoot>();
 
-            server.Dispose();
             client.Dispose();
+            server.Dispose();
 
             Assert.IsNotNull(proxy, "GetRootObject returned null!");
-            Assert.IsTrue(proxy.GetType() == expectedType, $"Returned type not expected! {proxy} : {expectedType}");
+            Assert.AreEqual(expectedType, proxy.GetType(), $"Returned type not expected! {proxy} : {expectedType}");
         }
 
         public static IEnumerable<object[]> GetStandardTestData()
@@ -48,11 +49,11 @@ namespace jNet.RPC.IntegrationTests.Communication
 
             var proxy = client.GetRootObject<IMockRoot>();
 
-            server.Dispose();
             client.Dispose();
+            server.Dispose();
             
             Assert.IsNotNull(proxy, "GetRootObject returned null!");
-            Assert.IsTrue(proxy.GetType() == expectedType, $"Returned type not expected! {proxy} : {expectedType}");
+            Assert.AreEqual(expectedType, proxy.GetType(), $"Returned type not expected! {proxy} : {expectedType}");
         }
 
         public static IEnumerable<object[]> GetDefinedTestData()
@@ -70,11 +71,11 @@ namespace jNet.RPC.IntegrationTests.Communication
 
             var proxy = client.GetRootObject<IMockRoot>();
 
-            server.Dispose();
             client.Dispose();
+            server.Dispose();
 
             Assert.IsNotNull(proxy, "GetRootObject returned null!");
-            Assert.IsTrue(proxy.GetType() == expectedType, $"Returned wrong type! {proxy} : {expectedType}");
+            Assert.AreEqual(expectedType, proxy.GetType(), $"Returned wrong type! {proxy} : {expectedType}");
         }
     }
 }

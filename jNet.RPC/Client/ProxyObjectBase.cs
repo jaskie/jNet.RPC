@@ -14,8 +14,7 @@ namespace jNet.RPC.Client
         private int _isDisposed;
         private int _isFinalizeRequested;
         private RemoteClient _client;
-        private static NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
-
+        private readonly static NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
         public void Dispose()
         {

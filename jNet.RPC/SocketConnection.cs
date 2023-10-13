@@ -268,7 +268,7 @@ namespace jNet.RPC
 
         private Thread CreateThread(ThreadStart threadStart, string threadName)
         {
-            return  new Thread(threadStart)
+            return new Thread(threadStart)
             {
                 IsBackground = true,
                 Name = threadName,

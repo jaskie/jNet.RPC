@@ -57,6 +57,7 @@
     <Compile Include="Server\DtoBaseTests.cs" />
     <Compile Include="Server\ServerReferenceResolverTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SocketMessageTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
