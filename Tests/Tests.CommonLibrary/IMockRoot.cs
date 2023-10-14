@@ -7,5 +7,7 @@ namespace Tests.CommonLibrary
         IMockMember SingleMember { get; set; }
         List<IMockMember> Members { get; }
         string SimpleProperty { get; set; }
+        string SimpleMethod();
+        IMockMember GetMockMember(int index); 
     }
 }

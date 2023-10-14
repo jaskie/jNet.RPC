@@ -9,7 +9,6 @@ namespace jNet.RPC.UnitTests
     [TestClass]
     public class SocketMessageTests
     {
-        private SocketMessage sut = new SocketMessage();
 
         private class DtoMock : IDto
         {
@@ -32,17 +31,17 @@ namespace jNet.RPC.UnitTests
             var parameterCount = 123;
             var valueStream = new MemoryStream();
             valueStream.Write(dto.DtoGuid.ToByteArray(), 0, 16);
-            var sourceMessage = new SocketMessage(messageType, dto, memberName, parameterCount, null);
+            var sourceMessage = new SocketMessage(messageType, dto.DtoGuid, memberName, parameterCount, null);
 
             // act
             var encoded = sourceMessage.Encode(valueStream);
-            var length = BitConverter.ToUInt32(encoded, 0);
+            var length = BitConverter.ToInt32(encoded, 0);
             var encodedWithoutLength = new byte[length];
-            Array.Copy(encoded, sizeof(uint), encodedWithoutLength, 0, encodedWithoutLength.Length);
-            var receivedMessage = new SocketMessage(encodedWithoutLength);
+            Buffer.BlockCopy(encoded, sizeof(int), encodedWithoutLength, 0, encodedWithoutLength.Length);
+            var receivedMessage = new SocketMessage(encodedWithoutLength, length);
 
             // assert
-            Assert.AreEqual((uint)encoded.Length, length + sizeof(uint));
+            Assert.AreEqual(encoded.Length, length + sizeof(int));
             Assert.AreEqual(messageType, receivedMessage.MessageType);
             Assert.AreEqual(memberName, receivedMessage.MemberName);
             Assert.AreEqual(dto.DtoGuid, receivedMessage.DtoGuid);

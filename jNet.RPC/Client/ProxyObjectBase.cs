@@ -11,16 +11,9 @@ namespace jNet.RPC.Client
 {
     public abstract class ProxyObjectBase : IDto
     {
-        private int _isDisposed;
         private int _isFinalizeRequested;
         private RemoteClient _client;
         private readonly static NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
-
-        public void Dispose()
-        {
-            if (Interlocked.Exchange(ref _isDisposed, 1) == default)
-                DoDispose();
-        }
 
         ~ProxyObjectBase()
         {
@@ -53,8 +46,6 @@ namespace jNet.RPC.Client
 
         protected T Get<T>([CallerMemberName] string propertyName = null)
         {
-            if (_isDisposed != default)
-                return default;
             if (string.IsNullOrEmpty(propertyName))
                 return default;
             var result = _client.Get<T>(this, propertyName);
@@ -63,8 +54,6 @@ namespace jNet.RPC.Client
 
         protected internal void Set<T>(T value, [CallerMemberName] string propertyName = null)
         {
-            if (_isDisposed != default)
-                return;
             Type type = typeof(T);
             FieldInfo field =  GetField(type, propertyName);
             if (field != null)
@@ -78,30 +67,22 @@ namespace jNet.RPC.Client
 
         protected internal void Invoke([CallerMemberName] string methodName = null, params object[] parameters)
         {
-            if (_isDisposed != default)
-                return;
             _client.Invoke(this, methodName, parameters);
         }
 
         protected internal T Query<T>([CallerMemberName] string methodName = null, params object[] parameters)
         {
-            if (_isDisposed != default)
-                return default;
             return _client.Query<T>(this, methodName, parameters);
         }
 
         protected internal void EventAdd<T>(T handler, [CallerMemberName] string eventName = null)
         {
-            if (_isDisposed != default)
-                return;
             if (handler == null && !DtoGuid.Equals(Guid.Empty))
                 _client?.EventAdd(this, eventName);
         }
 
         protected internal void EventRemove<T>(T handler, [CallerMemberName] string eventName = null)
         {
-            if (_isDisposed != default)
-                return;
             if (handler == null && !DtoGuid.Equals(Guid.Empty))
             {
                 _client?.EventRemove(this, eventName);
@@ -113,11 +94,6 @@ namespace jNet.RPC.Client
         protected void NotifyPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        protected virtual void DoDispose()
-        {
-            _client = null;
         }
 
         [OnDeserialized]

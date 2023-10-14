@@ -17,8 +17,21 @@ namespace Tests.ClientLibrary
 #pragma warning restore
 
         public IMockMember SingleMember { get => _singleMember; set => Set(value); }
+        
         public List<IMockMember> Members => _members;
+
         public string SimpleProperty { get => _simpleProperty; set => Set(value); }
+
+        public string SimpleMethod()
+        {
+            return Query<string>();
+        }
+
+        public IMockMember GetMockMember(int index)
+        {
+            return Query<IMockMember>(parameters: new object[] { index });
+        }
+
         protected override void OnEventNotification(SocketMessage message)
         {
         }

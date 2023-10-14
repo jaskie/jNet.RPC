@@ -19,40 +19,35 @@ namespace jNet.RPC
             ProxyFinalized,
             ProxyResurrected,
             ProxyMissing,
-            Exception,
+            Exception
         }
         private const int GUID_LENGTH = 0x10;
-        private readonly byte[] _rawData;
-        private readonly int _valueStartIndex;
-        private static readonly byte[] ContentLengthPlaceholder = new byte[sizeof(uint)] { 0, 0, 0, 0 };
+        private readonly byte[] _valueData;
+        private static readonly byte[] ContentLengthPlaceholder = new byte[sizeof(int)] { 0, 0, 0, 0 };
 
-        internal SocketMessage(object value = null)
+        // used to prepare response on server side
+        internal SocketMessage(Guid messageGuid, SocketMessageType messageType, Guid dtoGuid, object value)
         {
-            MessageGuid = Guid.NewGuid();
+            MessageGuid = messageGuid;
+            MessageType = messageType;
+            DtoGuid = dtoGuid;
             Value = value;
         }
 
-        internal SocketMessage (SocketMessageType socketMessageType, IDto dto, string memberName, int paramsCount, object value)
+        internal SocketMessage (SocketMessageType messageType, Guid dtoGuid, string memberName, int paramsCount, object value)
         {
             MessageGuid = Guid.NewGuid();
             Value = value;
-            MessageType = socketMessageType;
-            DtoGuid = dto?.DtoGuid ?? Guid.Empty;
+            MessageType = messageType;
+            DtoGuid = dtoGuid;
             MemberName = memberName;
             ParametersCount = paramsCount;
         }
 
-        internal SocketMessage(SocketMessage originalMessage, object value)
+        // used on receive thread
+        internal SocketMessage(byte[] rawData, int dataLength)
         {
-            MessageGuid = originalMessage.MessageGuid;
-            MessageType = originalMessage.MessageType;
-            DtoGuid = originalMessage.DtoGuid;
-            MemberName = originalMessage.MemberName;
-            Value = value;
-        }
-
-        internal SocketMessage(byte[] rawData)
-        {
+            Debug.Assert(rawData.Length >= dataLength);
             var index = 0;
             MessageType = (SocketMessageType) rawData[index];
             byte[] guidBuffer = new byte[GUID_LENGTH];
@@ -63,25 +58,46 @@ namespace jNet.RPC
             var memberNameLength = BitConverter.ToInt32(rawData, index += GUID_LENGTH);
             MemberName = Encoding.ASCII.GetString(rawData, index += sizeof(int), memberNameLength);
             ParametersCount = BitConverter.ToInt32(rawData, index += memberNameLength);
-            _valueStartIndex = index + sizeof(int);
-            _rawData = rawData;
-            Debug.Assert(_valueStartIndex == 41 + memberNameLength, "There are 41 bytes and MemberName string before value starts");
+            var valueStartIndex = index + sizeof(int);
+            // rest of the data is value
+            if (dataLength > valueStartIndex)
+            {
+                _valueData = new byte[dataLength - valueStartIndex];
+                Buffer.BlockCopy(rawData, valueStartIndex, _valueData, 0, _valueData.Length);
+            }
+            Debug.Assert(valueStartIndex == 41 + memberNameLength, "There are 41 bytes and MemberName string before value starts");
         }
 
-        public object Value { get; }
+        /// <summary>
+        /// Value to serialize
+        /// </summary>
+        public readonly object Value;
 
+        /// <summary>
+        /// Guid of message. Client request and response are expected to have the same MessageGuid
+        /// </summary>
         public readonly Guid MessageGuid;
-        public Guid DtoGuid;
-        public SocketMessageType MessageType;
+
+        /// <summary>
+        /// Guid of object on which call is invoked
+        /// </summary>
+        public readonly Guid DtoGuid;
+
+        /// <summary>
+        /// Kind of operation to execute
+        /// </summary>
+        public readonly SocketMessageType MessageType;
+
         /// <summary>
         /// Object member (method, property or event) name
         /// </summary>
-        public string MemberName;
+        public readonly string MemberName;
 
         /// <summary>
-        /// count of parameters passed from client to server, 
+        /// count of parameters passed from client to server
+        /// only used when calling a method
         /// </summary>
-        public int ParametersCount;
+        public readonly int ParametersCount;
 
         public override string ToString()
         {
@@ -92,7 +108,7 @@ namespace jNet.RPC
         {
             using (var stream = new MemoryStream())
             {
-                stream.Write(ContentLengthPlaceholder, 0, sizeof(uint));
+                stream.Write(ContentLengthPlaceholder, 0, sizeof(int));
 
                 stream.WriteByte((byte)MessageType);
 
@@ -115,17 +131,17 @@ namespace jNet.RPC
                     valueStream.Position = 0;
                     valueStream.CopyTo(stream);
                 }
-                var contentLength = BitConverter.GetBytes((uint)(stream.Length - sizeof(uint)));
+                var contentLength = BitConverter.GetBytes((int)(stream.Length - sizeof(int)));
                 stream.Position = 0;
                 stream.Write(contentLength, 0, ContentLengthPlaceholder.Length);
                 return stream.ToArray();
             }
         }
 
-        public MemoryStream GetValueStream() => _rawData.Length > _valueStartIndex ? new MemoryStream(_rawData, _valueStartIndex, _rawData.Length - _valueStartIndex) : null;
+        public MemoryStream GetValueStream() => _valueData is null ? null : new MemoryStream(_valueData);
 
 #if DEBUG
-        public string ValueString => Encoding.UTF8.GetString(_rawData, _valueStartIndex, _rawData.Length - _valueStartIndex);
+        public string ValueString => _valueData is null ? "null"  : Encoding.UTF8.GetString(_valueData);
 #endif
     }
 

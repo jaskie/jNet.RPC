@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
+using NLog.LayoutRenderers;
 
 namespace jNet.RPC
 {
@@ -24,7 +25,7 @@ namespace jNet.RPC
 #else
             100000;
 #endif
-        private const uint MaxMessageSize = 0x8000000; // 128 MB
+        private const int MaxMessageSize = 0x4000000; // 64 MB
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private int _disposed;
         private readonly BlockingCollection<byte[]> _sendQueue;
@@ -193,49 +194,54 @@ namespace jNet.RPC
         protected virtual void ReadThreadProc()
         {
             var stream = Client.GetStream();
-            byte[] dataBuffer = null;
-            var sizeBuffer = new byte[sizeof(uint)];
+            byte[] dataBuffer = new byte[1024];
+            var sizeBuffer = new byte[sizeof(int)];
             int dataIndex = 0;
-            int receivedBytesCount;
+            int receivedBytesCount, messageSize = 0;
+
             while (!DisconnectTokenSource.IsCancellationRequested)
             {
                 try
                 {
-                    if (dataBuffer is null)
+                    if (messageSize == 0)
                     {
-                        receivedBytesCount = stream.Read(sizeBuffer, dataIndex, sizeof(uint) - dataIndex);
+                        receivedBytesCount = stream.Read(sizeBuffer, dataIndex, sizeof(int) - dataIndex);
                         if (receivedBytesCount == 0)
                         {
                             Shutdown();
                             break;
                         }
                         dataIndex += receivedBytesCount;
-                        if (dataIndex != sizeof(uint))
+                        if (dataIndex != sizeof(int))
                             continue;
-                        var dataLength = BitConverter.ToUInt32(sizeBuffer, 0);
-                        if (dataLength > MaxMessageSize)
+                        messageSize = BitConverter.ToInt32(sizeBuffer, 0);
+                        if (messageSize > MaxMessageSize)
                         {
-                            throw new ApplicationException($"Too large message ({dataLength} bytes) received.");
+                            throw new ApplicationException($"Too large message ({messageSize} bytes) received.");
                         }
-                        dataBuffer = new byte[dataLength];
+                        if (dataBuffer.Length < messageSize)
+                        {
+                            Array.Resize(ref dataBuffer, messageSize);
+                            Logger.Debug("Resized message buffer to {0} bytes", messageSize);
+                        }
                         dataIndex = 0;
                     }
                     else
                     {
-                        receivedBytesCount = stream.Read(dataBuffer, dataIndex, dataBuffer.Length - dataIndex);
+                        receivedBytesCount = stream.Read(dataBuffer, dataIndex, messageSize - dataIndex);
                         if (receivedBytesCount == 0)
                         {
                             Shutdown();
                             break;
                         }
                         dataIndex += receivedBytesCount;
-                        if (dataIndex != dataBuffer.Length)
+                        if (dataIndex != messageSize)
                             continue;
-                        var message = new SocketMessage(dataBuffer);
+                        var message = new SocketMessage(dataBuffer, messageSize);
                         if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
                             Logger.Trace("Message received: {0}", message);
                         _receiveQueue.Add(message);
-                        dataBuffer = null;
+                        messageSize = 0;
                         dataIndex = 0;
                     }
                 }
@@ -251,10 +257,12 @@ namespace jNet.RPC
                 catch (ApplicationException e)
                 {
                     Logger.Error(e);
+                    Shutdown();
+                    break;
                 }
                 catch (Exception e)
                 {
-                    Logger.Error(e, "Read thread unexpected exception. Data buffer was {0}. Original exception:", dataBuffer is null ? "null" : BitConverter.ToString(dataBuffer));
+                    Logger.Error(e, "Read thread unexpected exception. Data buffer was {0}. Original exception:", BitConverter.ToString(dataBuffer, 0, messageSize));
                     Shutdown();
                     break;
                 }

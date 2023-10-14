@@ -8,7 +8,7 @@ using System.Xml.Serialization;
 
 namespace jNet.RPC.Server
 {
-    public abstract class ServerObjectBase: IDto
+    public abstract class ServerObjectBase: IDto, IDisposable
     {
         private static readonly ConcurrentDictionary<Guid, WeakReference<ServerObjectBase>> AllDtos = new ConcurrentDictionary<Guid, WeakReference<ServerObjectBase>>();        
 

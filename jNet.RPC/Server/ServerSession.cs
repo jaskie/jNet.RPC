@@ -18,16 +18,16 @@ namespace jNet.RPC.Server
         private readonly Dictionary<DelegateKey, Delegate> _delegates = new Dictionary<DelegateKey, Delegate>();
         private readonly IPrincipal _sessionUser;
         private readonly IPEndPoint _remoteAddress;
-        private readonly IDto _initialObject;
+        private readonly IDto _rootObject;
         private readonly ReferenceResolver _referenceResolver = new ReferenceResolver();
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
-        public ServerSession(TcpClient client, IDto initialObject, IPrincipal sessionUser): base(client)
+        public ServerSession(TcpClient client, IDto rootObject, IPrincipal sessionUser): base(client)
         {
             _remoteAddress = client.Client.RemoteEndPoint as IPEndPoint ?? throw new ArgumentException("Client RemoteEndpoint is invalid");
             _sessionUser = sessionUser;
             _serializer.SerializationBinder = new SerializationBinder();
-            _initialObject = initialObject;
+            _rootObject = rootObject;
             Logger.Info("Remote {0} from {1} successfully connected", _sessionUser.Identity, _remoteAddress);
             _referenceResolver.ReferencePropertyChanged += ReferenceResolver_ReferencePropertyChanged;
             StartThreads();
@@ -36,7 +36,7 @@ namespace jNet.RPC.Server
 #if DEBUG
         ~ServerSession()
         {
-            Debug.WriteLine("Finalized: {0} for {1}", this, _initialObject);
+            Debug.WriteLine("Finalized: {0} for {1}", this, _rootObject);
         }
 #endif
 
@@ -66,7 +66,7 @@ namespace jNet.RPC.Server
                         Logger.Trace("Processing message: {0}", message);
                     if (message.MessageType == SocketMessage.SocketMessageType.RootQuery)
                     {
-                        SendResponse(message, _initialObject);
+                        SendResponse(message, _rootObject);
                         continue;
                     }
                     if (message.MessageType == SocketMessage.SocketMessageType.ProxyMissing)
@@ -191,11 +191,11 @@ namespace jNet.RPC.Server
             }
         }
 
-        
         private void SendException(SocketMessage message, Exception exception)
         {
-            message.MessageType = SocketMessage.SocketMessageType.Exception;
-            SendResponse(message, new Exception(exception.Message, exception.InnerException == null ? null : new Exception(exception.InnerException.Message)));
+            var value = new Exception(exception.Message, exception.InnerException == null ? null : new Exception(exception.InnerException.Message));
+            var response = new SocketMessage(message.MessageGuid, SocketMessage.SocketMessageType.Exception, message.DtoGuid, value);
+            Send(response);
         }
 
         protected override void OnDispose()
@@ -219,7 +219,7 @@ namespace jNet.RPC.Server
 
         private void SendResponse(SocketMessage message, object response)
         {
-            Send(new SocketMessage(message, response));
+            Send(new SocketMessage(message.MessageGuid, message.MessageType, message.DtoGuid, response));
         }
 
 
@@ -274,20 +274,10 @@ namespace jNet.RPC.Server
                     {
                         value = new PropertyChangedWithValueEventArgs(propertyChangedEventArgs.PropertyName, null);
                     }
-                    Send(new SocketMessage(value)
-                    {
-                        MessageType = SocketMessage.SocketMessageType.EventNotification,
-                        DtoGuid = dto.DtoGuid,
-                        MemberName = eventName,
-                    });
+                    Send(new SocketMessage(SocketMessage.SocketMessageType.EventNotification, dto.DtoGuid, eventName, 0, value));
                 }
                 else
-                    Send(new SocketMessage(e)
-                    {
-                        MessageType = SocketMessage.SocketMessageType.EventNotification,
-                        DtoGuid = dto.DtoGuid,
-                        MemberName = eventName
-                    });
+                    Send(new SocketMessage(SocketMessage.SocketMessageType.EventNotification, dto.DtoGuid, eventName, 0, e));
             }
             catch (Exception exception)
             {

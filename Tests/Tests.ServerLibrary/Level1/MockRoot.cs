@@ -29,5 +29,15 @@ namespace Tests.ServerLibrary.Level1
             SingleMember = new MockMember { ValueString = "Mock Object", ValueInt = 0 };
             SimpleProperty = "Test Value";
         }
+
+        public string SimpleMethod()
+        {
+            return nameof(SimpleMethod);
+        }
+
+        public IMockMember GetMockMember(int index)
+        {
+            return _members[index];
+        }
     }
 }

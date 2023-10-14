@@ -3,6 +3,7 @@ using jNet.RPC.Server;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Tests.CommonLibrary;
 
 namespace jNet.RPC.IntegrationTests.Communication
@@ -76,6 +77,44 @@ namespace jNet.RPC.IntegrationTests.Communication
 
             Assert.IsNotNull(proxy, "GetRootObject returned null!");
             Assert.AreEqual(expectedType, proxy.GetType(), $"Returned wrong type! {proxy} : {expectedType}");
+        }
+
+        [TestMethod]
+        public void ResolvingProxyType_ProxyIsFinalizing()
+        {
+            // arrange
+            var root = new Tests.ServerLibrary.MockRoot();
+            var server = new ServerHost(1035, root);
+            var client = new RemoteClient("127.0.0.1:1035");
+            client.AddProxyAssembly(typeof(Tests.ClientLibrary.MockRoot).Assembly);
+
+            // act
+            var rootProxy = client.GetRootObject<IMockRoot>();
+            var reference = GetMockMember(rootProxy);
+
+            // assert - proxy should exists
+            Assert.IsFalse(IsReferenceNull(reference));
+
+            // act
+            GC.Collect();
+            GC.Collect();
+
+            // assert - after GC run proxy should be destroyed
+            Assert.IsTrue(IsReferenceNull(reference));
+
+            // cleanup
+            client.Dispose();
+            server.Dispose();
+        }
+
+        private WeakReference GetMockMember(IMockRoot proxy)
+        {
+            return new WeakReference(proxy.GetMockMember(0));
+        }
+
+        private static bool IsReferenceNull(WeakReference reference)
+        {
+            return reference.Target is null;
         }
     }
 }

@@ -32,7 +32,7 @@ namespace jNet.RPC.Client
         {
             Send(new SocketMessage(
                 SocketMessage.SocketMessageType.ProxyFinalized,
-                proxy,
+                proxy.DtoGuid,
                 string.Empty,
                 0,
                 null));
@@ -42,7 +42,7 @@ namespace jNet.RPC.Client
         {
             Send(new SocketMessage(
                 SocketMessage.SocketMessageType.ProxyResurrected,
-                proxy,
+                proxy.DtoGuid,
                 string.Empty,
                 0,
                 null));
@@ -50,11 +50,7 @@ namespace jNet.RPC.Client
 
         private IDto Resolver_ReferenceMissing(Guid reference)
         {
-            var dto = SendAndGetResponse<IDto>(new SocketMessage()
-            {
-                MessageType = SocketMessage.SocketMessageType.ProxyMissing,
-                DtoGuid = reference
-            });
+            var dto = SendAndGetResponse<IDto>(new SocketMessage(SocketMessage.SocketMessageType.ProxyMissing, reference, string.Empty, 0, null));
             if (dto == null)
                 Logger.Warn("Dto {0} not found on server", reference);
             else

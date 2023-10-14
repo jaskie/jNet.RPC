@@ -10,6 +10,7 @@ namespace Tests.ServerLibrary
         private List<IMockMember> _members;
         private string _simpleProperty;
         private IMockMember _singleMember;
+        private IMockMember _methodCallMember;
 
         [DtoMember]
         public IMockMember SingleMember { get => _singleMember; set => SetField(ref _singleMember, value); }
@@ -28,6 +29,17 @@ namespace Tests.ServerLibrary
             };
             SingleMember = new MockMember { ValueString = "Mock Object", ValueInt = 0 };
             SimpleProperty = "Test Value";
+            _methodCallMember = new MockMember { ValueInt = 10, ValueString = "Hidden mock member" };
         }
+        public string SimpleMethod()
+        {
+            return nameof(SimpleMethod);
+        }
+
+        public IMockMember GetMockMember(int index)
+        {
+            return _methodCallMember;
+        }
+
     }
 }

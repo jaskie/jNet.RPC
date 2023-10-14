@@ -28,7 +28,7 @@ namespace jNet.RPC.Client
         {
             try
             {
-                var queryMessage = new SocketMessage(SocketMessage.SocketMessageType.RootQuery, null, null, 0, null);
+                var queryMessage = new SocketMessage(SocketMessage.SocketMessageType.RootQuery, Guid.Empty, null, 0, null);
                 var response = SendAndGetResponse<T>(queryMessage);
                 return response;
             }
@@ -45,7 +45,7 @@ namespace jNet.RPC.Client
             {
                 var queryMessage = new SocketMessage(
                     SocketMessage.SocketMessageType.MethodExecute,
-                    dto,
+                    dto.DtoGuid,
                     methodName,
                     parameters.Length,
                     new SocketMessageArrayValue { Value = parameters });
@@ -64,7 +64,7 @@ namespace jNet.RPC.Client
             {
                 var queryMessage = new SocketMessage(
                     SocketMessage.SocketMessageType.PropertyGet,
-                    dto,
+                    dto.DtoGuid,
                     propertyName,
                     0,
                     null
@@ -84,7 +84,7 @@ namespace jNet.RPC.Client
             {
                 var queryMessage = new SocketMessage(
                     SocketMessage.SocketMessageType.MethodExecute,
-                    dto,
+                    dto.DtoGuid,
                     methodName,
                     parameters.Length,
                     new SocketMessageArrayValue { Value = parameters });
@@ -103,7 +103,7 @@ namespace jNet.RPC.Client
             {
                 var queryMessage = new SocketMessage(
                 SocketMessage.SocketMessageType.PropertySet,
-                dto,
+                dto.DtoGuid,
                 propertyName,
                 1,
                 value);
@@ -122,7 +122,7 @@ namespace jNet.RPC.Client
             {
                 var queryMessage = new  SocketMessage(
                 SocketMessage.SocketMessageType.EventAdd,
-                dto,
+                dto.DtoGuid,
                 eventName,
                 0,
                 null);
@@ -141,7 +141,7 @@ namespace jNet.RPC.Client
             {
                 var queryMessage = new  SocketMessage(
                 SocketMessage.SocketMessageType.EventRemove,
-                dto,
+                dto.DtoGuid,
                 eventName,
                 0,
                 null);

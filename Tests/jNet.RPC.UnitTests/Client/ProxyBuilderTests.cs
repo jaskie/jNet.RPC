@@ -59,7 +59,7 @@ namespace jNet.RPC.UnitTests.Client
 
         protected abstract void OnEventNotification(SocketMessage message);
 
-        protected T Deserialize<T>(SocketMessage message)
+        protected internal T DeserializeEventArgs<T>(SocketMessage message) where T : EventArgs
         {
             return (T)message.Value;
         }
@@ -95,8 +95,8 @@ namespace jNet.RPC.UnitTests.Client
 
         internal void CallOnEventNotification(string eventName, object eventArgs)
         {
-            OnEventNotification(new SocketMessage(eventArgs) { MessageType = SocketMessage.SocketMessageType.EventNotification, MemberName = eventName });
-        }        
+            OnEventNotification(new SocketMessage(SocketMessage.SocketMessageType.EventNotification, Guid.Empty, eventName, 0, eventArgs));
+        }
     }
 
 
@@ -132,7 +132,7 @@ namespace jNet.RPC.UnitTests.Client
 
 
         [TestMethod]
-        public void PropertyGetOnly()
+        public void ProxyBuilderTests_PropertyGetOnly()
         {
             var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
             var generator = new Random();
@@ -141,11 +141,11 @@ namespace jNet.RPC.UnitTests.Client
                 var nb = generator.Next();
                 ((ProxyBase)proxy).SetPropertyValue(nb, nameof(IBuildedInterface.IntValueGetOnlyProperty));
                 Assert.AreEqual(proxy.IntValueGetOnlyProperty, nb);
-            }            
+            }
         }
         
         [TestMethod]
-        public void PropertySetOnly()
+        public void ProxyBuilderTests_PropertySetOnly()
         {
             var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
             var generator = new Random();
@@ -154,11 +154,11 @@ namespace jNet.RPC.UnitTests.Client
                 var nb = generator.Next();
                 proxy.IntValueSetOnlyProperty = nb;
                 Assert.AreEqual(((ProxyBase)proxy).GetPropertyValue<int>(nameof(IBuildedInterface.IntValueSetOnlyProperty)), nb);
-            }            
+            }
         }
 
         [TestMethod]
-        public void PropertyGetAndSet()
+        public void ProxyBuilderTests_PropertyGetAndSet()
         {
             var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
             var generator = new Random();
@@ -172,7 +172,7 @@ namespace jNet.RPC.UnitTests.Client
         #endregion // property tests
 
         [TestMethod]
-        public void ParameterPassing()
+        public void ProxyBuilderTests_ParameterPassing()
         {
             var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
             proxy.VoidVoidMethod();
@@ -204,7 +204,7 @@ namespace jNet.RPC.UnitTests.Client
         }
 
         [TestMethod]
-        public void MethodValueReturn()
+        public void ProxyBuilderTests_MethodValueReturn()
         {
             var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
             var generator = new Random();
@@ -225,7 +225,7 @@ namespace jNet.RPC.UnitTests.Client
         }
 
         [TestMethod]
-        public void SimpleEventInvokation()
+        public void ProxyBuilderTests_SimpleEventInvokation()
         {
             var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
             int i = 0;
@@ -244,7 +244,7 @@ namespace jNet.RPC.UnitTests.Client
         }
         
         [TestMethod]
-        public void GenericEventInvokation()
+        public void ProxyBuilderTests_GenericEventInvokation()
         {
             var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
             var args = new TestEventArgs { IntValue = 3243423 };

@@ -3,7 +3,7 @@ using System.ComponentModel;
 
 namespace jNet.RPC
 {
-    public interface IDto: INotifyPropertyChanged, IDisposable
+    public interface IDto: INotifyPropertyChanged
     {
         Guid DtoGuid { get; }
     }
