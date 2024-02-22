@@ -3,7 +3,6 @@ using jNet.RPC.Server;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using Tests.CommonLibrary;
 
 namespace jNet.RPC.IntegrationTests.Communication
@@ -11,7 +10,6 @@ namespace jNet.RPC.IntegrationTests.Communication
     [TestClass]
     public class ResolvingProxyTypeTests
     {
-
         public static IEnumerable<object[]> GetLocalTestData()
         {
             yield return new object[] { new ServerHost(1024, new Tests.ServerLibrary.MockRoot()), new RemoteClient("127.0.0.1:1024"), typeof(Tests.ClientLibrary.MockRoot) };
@@ -84,8 +82,8 @@ namespace jNet.RPC.IntegrationTests.Communication
         {
             // arrange
             var root = new Tests.ServerLibrary.MockRoot();
-            var server = new ServerHost(1035, root);
-            var client = new RemoteClient("127.0.0.1:1035");
+            var server = new ServerHost(1036, root);
+            var client = new RemoteClient("127.0.0.1:1036");
             client.AddProxyAssembly(typeof(Tests.ClientLibrary.MockRoot).Assembly);
 
             // act

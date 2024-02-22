@@ -14,7 +14,9 @@ namespace jNet.RPC.UnitTests
         {
             public Guid DtoGuid { get; } = Guid.NewGuid();
 
+#pragma warning disable CS0067 // The event 'SocketMessageTests.DtoMock.PropertyChanged' is never used
             public event PropertyChangedEventHandler PropertyChanged;
+#pragma warning restore CS0067 // The event 'SocketMessageTests.DtoMock.PropertyChanged' is never used
 
             public void Dispose()
             {

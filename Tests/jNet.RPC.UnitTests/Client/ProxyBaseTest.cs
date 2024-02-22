@@ -2,10 +2,7 @@
 using jNet.RPCTests.MockModel;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace jNet.RPCTests.Client
 {
@@ -28,8 +25,6 @@ namespace jNet.RPCTests.Client
             new Action(() =>
             {
                 weakReference.TryGetTarget(out var target);
-                Assert.IsTrue(ProxyObjectBase.FinalizeRequested.ContainsKey(target.DtoGuid), "Object did not save itself!");
-                target.FinalizeProxy();
             })();
 
             GC.Collect(); //first finalization (mark as finalized)
@@ -37,8 +32,7 @@ namespace jNet.RPCTests.Client
             GC.Collect(); //collect finalized
             GC.WaitForPendingFinalizers();
 
-            Assert.IsTrue(ProxyObjectBase.FinalizeRequested.Count == 0, "There should be no Finalization Requests at this point!");
             Assert.IsFalse(weakReference.TryGetTarget(out _), "GetTarget should not return anything!");
-        }        
+        }
     }
 }

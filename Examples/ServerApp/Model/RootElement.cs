@@ -11,7 +11,7 @@ namespace ServerApp.Model
     {
         private List<IChildElement> _childElements = new List<IChildElement>();
         private string _name = "A root element name property";
-        private readonly object _sync = new(); //required as request may come from many client threads
+        private readonly object _sync = new object(); //required as request may come from many client threads
 
         public RootElement()
         {

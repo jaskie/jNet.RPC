@@ -36,6 +36,9 @@ namespace jNet.RPC.Client
             GC.ReRegisterForFinalize(this);
         }
 
+        /// <summary>
+        /// Exposed internally for tests
+        /// </summary>
         internal int IsFinalizeRequested => _isFinalizeRequested;
 
         public Guid DtoGuid { get; internal set; }

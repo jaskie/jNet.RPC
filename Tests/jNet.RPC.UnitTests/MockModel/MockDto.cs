@@ -1,5 +1,6 @@
 ﻿using jNet.RPC;
 using jNet.RPC.Server;
+using Tests.CommonLibrary;
 
 namespace jNet.RPCTests.MockModel
 {
@@ -8,11 +9,6 @@ namespace jNet.RPCTests.MockModel
         [DtoMember]
         public string Value { get; set; }
 
-        public MockDto()
-        {
-
-        }
-        
         public MockDto(string value)
         {
             Value = value;
