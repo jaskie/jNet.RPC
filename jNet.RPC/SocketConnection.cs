@@ -296,15 +296,5 @@ namespace jNet.RPC
             }
         }
 
-        protected T DeserializeValue<T>(SocketMessage message)
-        {
-            using (var stream = message.GetValueStream())
-            {
-                if (stream is null)
-                    return default(T);
-                using (var reader = new StreamReader(stream, false))
-                    return (T)_serializer.Deserialize(reader, typeof(T));
-            }
-        }
     }
 }

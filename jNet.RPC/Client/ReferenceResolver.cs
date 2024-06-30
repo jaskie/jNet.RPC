@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 
 namespace jNet.RPC.Client
@@ -55,8 +56,9 @@ namespace jNet.RPC.Client
                 }
                 else
                 {
-                    _proxiesToPopulate[proxy.DtoGuid] = proxy;
-                    Logger.Debug("AddReference already in knownDtos, will populate {0}", proxy.GetType());
+                    lock (((IDictionary)_proxiesToPopulate).SyncRoot)
+                        _proxiesToPopulate[proxy.DtoGuid] = proxy;
+                    Logger.Debug("AddReference: {0} already in knownDtos, will populate {1}", reference, value);
                 }
             }
         }
@@ -112,14 +114,17 @@ namespace jNet.RPC.Client
             }
         }
 
-        internal ProxyObjectBase TakeProxyToPopulate(Guid dtoGuid)
+        internal bool TryTakeProxyToPopulate(Guid dtoGuid, out ProxyObjectBase proxyToPopulate)
         {
-            if (_proxiesToPopulate.TryGetValue(dtoGuid, out var result))
+            lock (((IDictionary)_proxiesToPopulate).SyncRoot)
             {
-                _proxiesToPopulate.Remove(dtoGuid);
-                return result;
+                if (_proxiesToPopulate.TryGetValue(dtoGuid, out proxyToPopulate))
+                {
+                    _proxiesToPopulate.Remove(dtoGuid);
+                    return true;
+                }
             }
-            return null;
+            return false;
         }
 
         public void DeleteReference(Guid reference)
@@ -178,7 +183,7 @@ namespace jNet.RPC.Client
             }
         }
 
-        #region Test properties
+        #region Properties only used in tests
         internal Dictionary<Guid, WeakReference<ProxyObjectBase>> KnownDtos => _knownDtos;
         internal Dictionary<Guid, ProxyObjectBase> ProxiesToPopulate => _proxiesToPopulate;
         internal Dictionary<Guid, ProxyObjectBase> FinalizeRequested => _finalizeRequested;

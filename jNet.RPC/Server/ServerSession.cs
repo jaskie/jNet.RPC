@@ -4,11 +4,13 @@ using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Security.Principal;
+using System.Text;
 using System.Threading;
 
 namespace jNet.RPC.Server
@@ -88,7 +90,7 @@ namespace jNet.RPC.Server
                                                          m.GetParameters().Length == message.ParametersCount);
                                 if (methodToInvoke != null)
                                 {
-                                    var parameters = DeserializeValue<SocketMessageArrayValue>(message);
+                                    var parameters = Deserialize<SocketMessageArrayValue>(message);
                                     var methodParameters = methodToInvoke.GetParameters();
                                     for (var i = 0; i < methodParameters.Length; i++)
                                         MethodParametersAlignment.AlignType(ref parameters.Value[i],
@@ -133,7 +135,7 @@ namespace jNet.RPC.Server
                                 var setProperty = objectToInvoke.GetType().GetProperty(message.MemberName);
                                 if (setProperty != null)
                                 {
-                                    var parameter = DeserializeValue<object>(message);
+                                    var parameter = Deserialize<object>(message);
                                     MethodParametersAlignment.AlignType(ref parameter, setProperty.PropertyType);
                                     try
                                     {
@@ -289,6 +291,16 @@ namespace jNet.RPC.Server
         {
             NotifyClient(e.Dto, e, nameof(INotifyPropertyChanged.PropertyChanged));
         }
-
+        
+        private T Deserialize<T>(SocketMessage message)
+        {
+            using (var stream = message.GetValueStream())
+            {
+                if (stream is null)
+                    return default(T);
+                using (var reader = new StreamReader(stream, Encoding.Default, false))
+                    return (T)_serializer.Deserialize(reader, typeof(T));
+            }
+        }
     }
 }
