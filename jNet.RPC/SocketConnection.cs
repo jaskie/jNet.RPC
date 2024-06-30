@@ -288,7 +288,7 @@ namespace jNet.RPC
         {
             using (var serialized = new MemoryStream())
             {
-                using (var writer = new StreamWriter(serialized, Encoding.UTF8, 1024, true))
+                using (var writer = new StreamWriter(serialized, Encoding.Default, 1024, true))
                 {
                     _serializer.Serialize(writer, message.Value);
                 }

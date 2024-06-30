@@ -8,7 +8,7 @@ using System.Xml.Serialization;
 
 namespace jNet.RPC.Server
 {
-    public abstract class ServerObjectBase: IDto, IDisposable
+    public abstract class ServerObjectBase: IDto
     {
         private static readonly ConcurrentDictionary<Guid, WeakReference<ServerObjectBase>> AllDtos = new ConcurrentDictionary<Guid, WeakReference<ServerObjectBase>>();        
 
@@ -28,8 +28,6 @@ namespace jNet.RPC.Server
         [XmlIgnore]
         public Guid DtoGuid { get; } = Guid.NewGuid();
 
-        private int _disposed;
-
         ~ServerObjectBase()
         {
             AllDtos.TryRemove(DtoGuid, out var _);
@@ -44,20 +42,6 @@ namespace jNet.RPC.Server
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
-
-        public void Dispose()
-        {
-            if (Interlocked.Exchange(ref _disposed, 1) != default)
-                return;
-            DoDispose();
-        }
-
-        protected bool IsDisposed => _disposed != default;
-
-        protected virtual void DoDispose()
-        {
-            
-        }
 
         protected virtual void NotifyPropertyChanged([CallerMemberName] string propertyName = null)
         {

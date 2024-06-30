@@ -26,11 +26,12 @@ namespace jNet.RPC
         private static readonly byte[] ContentLengthPlaceholder = new byte[sizeof(int)] { 0, 0, 0, 0 };
 
         // used to prepare response on server side
-        internal SocketMessage(Guid messageGuid, SocketMessageType messageType, Guid dtoGuid, object value)
+        internal SocketMessage(Guid messageGuid, SocketMessageType messageType, Guid dtoGuid, string memberName, object value)
         {
             MessageGuid = messageGuid;
             MessageType = messageType;
             DtoGuid = dtoGuid;
+            MemberName = memberName;
             Value = value;
         }
 

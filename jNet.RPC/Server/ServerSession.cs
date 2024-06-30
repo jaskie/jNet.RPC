@@ -194,7 +194,7 @@ namespace jNet.RPC.Server
         private void SendException(SocketMessage message, Exception exception)
         {
             var value = new Exception(exception.Message, exception.InnerException == null ? null : new Exception(exception.InnerException.Message));
-            var response = new SocketMessage(message.MessageGuid, SocketMessage.SocketMessageType.Exception, message.DtoGuid, value);
+            var response = new SocketMessage(message.MessageGuid, SocketMessage.SocketMessageType.Exception, message.DtoGuid, message.MemberName, value);
             Send(response);
         }
 
@@ -219,7 +219,7 @@ namespace jNet.RPC.Server
 
         private void SendResponse(SocketMessage message, object response)
         {
-            Send(new SocketMessage(message.MessageGuid, message.MessageType, message.DtoGuid, response));
+            Send(new SocketMessage(message.MessageGuid, message.MessageType, message.DtoGuid, message.MemberName, response));
         }
 
 

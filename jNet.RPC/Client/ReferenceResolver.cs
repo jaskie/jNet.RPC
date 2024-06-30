@@ -130,6 +130,7 @@ namespace jNet.RPC.Client
                 {
                     _finalizeRequested.Remove(reference);
                     proxy.Finalized -= Proxy_Finalized;
+                    Logger.Trace("Deleted reference {0}", reference);
                     return;
                 }
             }
