@@ -28,6 +28,7 @@ namespace jNet.RPC
         private const int MaxMessageSize = 0x4000000; // 64 MB
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private int _disposed;
+        private readonly string _remoteAddress; 
         private readonly BlockingCollection<byte[]> _sendQueue;
         private readonly BlockingCollection<SocketMessage> _receiveQueue = new BlockingCollection<SocketMessage>();
 
@@ -42,6 +43,7 @@ namespace jNet.RPC
 
         protected SocketConnection(TcpClient client)
         {
+            _remoteAddress = client.Client.RemoteEndPoint.ToString();
             Client = client;
             client.NoDelay = true;
             _sendQueue = new BlockingCollection<byte[]>(0x100000);
@@ -62,6 +64,7 @@ namespace jNet.RPC
 
         protected SocketConnection(string address)
         {
+            _remoteAddress = address;
             _sendQueue = new BlockingCollection<byte[]>(MessageQueueCapacity);
             _serializer = JsonSerializer.CreateDefault(new JsonSerializerSettings
             {
@@ -126,7 +129,7 @@ namespace jNet.RPC
         {
             if (DisconnectTokenSource.IsCancellationRequested)
                 return;
-            Logger.Info("Disconnected from {0}", Client.Client.RemoteEndPoint);
+            Logger.Info("Disconnected from {0}", _remoteAddress);
             Client.Client.Close();
             DisconnectTokenSource.Cancel();
         }
