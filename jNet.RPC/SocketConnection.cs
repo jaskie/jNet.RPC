@@ -130,7 +130,14 @@ namespace jNet.RPC
             if (DisconnectTokenSource.IsCancellationRequested)
                 return;
             Logger.Info("Disconnected from {0}", _remoteAddress);
-            Client.Client.Close();
+            try
+            {
+                Client.Close();
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Error while shutting down connection to {0}", _remoteAddress);
+            }
             DisconnectTokenSource.Cancel();
         }
 
