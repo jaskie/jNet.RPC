@@ -3,6 +3,7 @@ using SharedInterfaces;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Configuration;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,8 +12,6 @@ namespace ClientApp.ViewModel
 {
     class MainWindowViewModel : IDisposable, INotifyPropertyChanged
     {
-        const string RemoteAddress = "127.0.0.1:1356";
-
         private bool _isConnecting;
         private RemoteClient _remoteClient;
         private string _connectionMessage;
@@ -78,7 +77,7 @@ namespace ClientApp.ViewModel
 
         private void Connect()
         {
-            var address = RemoteAddress;
+            var address = ConfigurationManager.AppSettings["RemoteEndpoint"];
             ConnectionMessage = $"Connecting to {address}";
             IsConnecting = true;
             while (!_isDisposed && _remoteClient is null)
