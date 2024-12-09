@@ -5,7 +5,7 @@ namespace SharedInterfaces
 {
     public interface IRootElement
     {
-        IChildElement AddChild();
+        void AddChild();
         bool RemoveChild(IChildElement childElement);
         IChildElement[] GetChildrens();
         string Name { get; set; }

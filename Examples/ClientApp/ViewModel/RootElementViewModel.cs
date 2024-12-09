@@ -14,7 +14,6 @@ namespace ClientApp.ViewModel
     class RootElementViewModel: INotifyPropertyChanged, IDisposable
     {
         private ChildElementViewModel _selectedChildElement;
-        private IChildElement _lastAddedChild;
 
         public RootElementViewModel(IRootElement root)
         {
@@ -56,7 +55,7 @@ namespace ClientApp.ViewModel
 
         private void AddChild(object _)
         {
-            _lastAddedChild = Root.AddChild();
+            Root.AddChild();
         }
 
         private void RemoveChild(object _)
@@ -82,8 +81,6 @@ namespace ClientApp.ViewModel
             {
                 var newVm = new ChildElementViewModel(e.ChildElement);
                 ChildElements.Add(newVm);
-                if (e.ChildElement == _lastAddedChild)
-                    SelectedChildElement = newVm;
             });
         }
 

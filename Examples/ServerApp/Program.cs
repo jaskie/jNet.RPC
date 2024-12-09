@@ -19,7 +19,7 @@ namespace ServerApp
                 Layout = @"${date:format=HH\:mm\:ss} ${level} ${message} ${exception}"
             };
             config.AddTarget(consoleTarget);
-            config.AddRuleForAllLevels(consoleTarget);
+            config.AddRule(LogLevel.Trace, LogLevel.Fatal, consoleTarget);
             LogManager.Configuration = config;
         }
 
@@ -29,37 +29,38 @@ namespace ServerApp
             ConfigureLogger();
             try
             {
-                var host = new ServerHost(ListenPort, new RootElement());
-                bool terminate = false;
-                while (!terminate)
+                using (var host = new ServerHost(ListenPort, new RootElement()))
                 {
-                    Console.Write('>');
-                    var line = Console.ReadLine();
-                    var lineParts = line?.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                    if (lineParts?.Length >= 1)
-                        switch (lineParts[0].ToLower())
-                        {
-                            case "quit":
-                                var clientCount = host.ClientCount;
-                                if (clientCount > 0)
-                                {
-                                    Console.WriteLine($"There {(clientCount == 1 ? "is" : "are")} {clientCount} connected client{(clientCount == 1 ? "" : "s")}.\nUse forcequit command to terminate application.");
-                                    continue;
-                                }
-                                terminate = true;
-                                break;
-                            case "forcequit":
-                                terminate = true;
-                                break;
-                            default:
-                                Console.WriteLine(@"Available commands:
+                    bool terminate = false;
+                    while (!terminate)
+                    {
+                        Console.Write('>');
+                        var line = Console.ReadLine();
+                        var lineParts = line?.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (lineParts?.Length >= 1)
+                            switch (lineParts[0].ToLower())
+                            {
+                                case "quit":
+                                    var clientCount = host.ClientCount;
+                                    if (clientCount > 0)
+                                    {
+                                        Console.WriteLine($"There {(clientCount == 1 ? "is" : "are")} {clientCount} connected client{(clientCount == 1 ? "" : "s")}.\nUse forcequit command to terminate application.");
+                                        continue;
+                                    }
+                                    terminate = true;
+                                    break;
+                                case "forcequit":
+                                    terminate = true;
+                                    break;
+                                default:
+                                    Console.WriteLine(@"Available commands:
 - quit
 - forcequit");
-                                break;
+                                    break;
 
-                        }
+                            }
+                    }
                 }
-                host.Dispose();
             }
             catch
             {

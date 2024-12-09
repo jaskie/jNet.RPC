@@ -244,11 +244,12 @@ namespace jNet.RPC.Server
             var signature = new DelegateKey(objectToInvoke.DtoGuid, ei.Name);
             lock (((IDictionary) _delegates).SyncRoot)
             {
-                var delegateToRemove = _delegates[signature];
-                if (!_delegates.Remove(signature))
-                    return;
-                ei.RemoveEventHandler(objectToInvoke, delegateToRemove);
-                Logger.Trace("Server: removed delegate {0} on {1}", signature, objectToInvoke);
+                if (_delegates.TryGetValue(signature, out var delegateToRemove) &&
+                    _delegates.Remove(signature))
+                {
+                    ei.RemoveEventHandler(objectToInvoke, delegateToRemove);
+                    Logger.Trace("Server: removed delegate {0} on {1}", signature, objectToInvoke);
+                }
             }
         }
 
