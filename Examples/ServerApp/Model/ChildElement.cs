@@ -12,7 +12,7 @@ namespace ServerApp.Model
 
         [DtoMember]
         public double Value { get => _value; set => SetField(ref _value, value); }
-        
+
         [DtoMember]
         public string Name { get => _name; set => SetField(ref _name, value); }
     }

@@ -36,7 +36,7 @@ namespace jNet.RPC.Client
             foreach (var method in implementedInterfaces.SelectMany(i => i.GetMethods().Where(m => !m.IsSpecialName)).Distinct())
                 AddMethod(typeBuilder, method);
             var events = implementedInterfaces.SelectMany(i => i.GetEvents()).Distinct()
-                .Where(i => _proxyBaseType.GetEvent(i.Name) == null)
+                .Where(i => _proxyBaseType.GetEvent(i.Name) == null) // only add events that are not already implemented in base class
                 .ToArray();
             var fields = new FieldBuilder[events.Length];
             for (int i = 0; i < events.Length; i++)
@@ -96,7 +96,7 @@ namespace jNet.RPC.Client
 
                 var eventHandlerMethod = events[i].EventHandlerType.GetMethod(nameof(EventHandler.Invoke));
                 ilGen.Emit(OpCodes.Callvirt, eventHandlerMethod); // call the event field with sender and args parameters from evaluations stack
-            }                
+            }
             ilGen.MarkLabel(retLabel);
             ilGen.Emit(OpCodes.Ret);
             typeBuilder.DefineMethodOverride(method, originalMethod);

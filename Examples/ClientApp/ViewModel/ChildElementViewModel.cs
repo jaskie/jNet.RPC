@@ -16,6 +16,5 @@ namespace ClientApp.ViewModel
         
         public IChildElement ChildElement { get; }
 
-
     }
 }

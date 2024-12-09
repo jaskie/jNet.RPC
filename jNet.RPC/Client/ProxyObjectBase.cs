@@ -137,7 +137,7 @@ namespace jNet.RPC.Client
                     field.SetValue(this, value);
                 }
                 NotifyPropertyChanged(eav.PropertyName);
-            }           
+            }
             else OnEventNotification(message);
         }
 
@@ -149,7 +149,6 @@ namespace jNet.RPC.Client
             var foundField = t.GetFields(flags).FirstOrDefault(f => f.GetCustomAttributes(typeof(DtoMemberAttribute), true).Any(a =>((DtoMemberAttribute)a).PropertyName == fieldName));
             return foundField ?? GetField(t.BaseType, fieldName);
         }
-
 
     }
 }
