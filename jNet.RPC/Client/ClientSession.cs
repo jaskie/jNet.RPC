@@ -14,8 +14,6 @@ namespace jNet.RPC.Client
         private readonly ConcurrentDictionary<Guid, MessageRequest> _requests = new ConcurrentDictionary<Guid, MessageRequest>();
         private readonly ReferenceResolver _referenceResolver = new ReferenceResolver();
         private readonly NotificationExecutor _notificationExecutor;
-        private readonly object _deserializeLock = new object();
-        private const int DeserializeLockTimeout = 100;
 
         public ClientSession(string address) : base(address)
         {
@@ -83,9 +81,14 @@ namespace jNet.RPC.Client
                     }
                     if (response is null)
                         return default;
-                    if (response.MessageType == SocketMessage.SocketMessageType.Exception)
-                        throw Deserialize<Exception>(response);
-                    return Deserialize<T>(response);
+                    if (messageRequest.MessageType == SocketMessage.SocketMessageType.Exception)
+                        throw (Exception)response;
+                    if (typeof(T).IsEnum)
+                    {
+                        // TODO: find less triky way. The integer value from JSON is deserialized as encapsulated long, then casted to int and then to T using encapsulated object
+                        return (T)(object)(int)(long)response;
+                    }
+                    return (T)response;
                 }
             }
             catch (Exception e) when (e is OperationCanceledException || e is ObjectDisposedException)
@@ -102,9 +105,8 @@ namespace jNet.RPC.Client
                 try
                 {
                     var message = TakeNextMessage();
-                    if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
-                        Logger.Trace("Processing message: {0}", message);
-
+                    Logger.Trace("Processing message: {0}", message);
+                    var deserialized = Deserialize(message);
                     switch (message.MessageType)
                     {
                         case SocketMessage.SocketMessageType.ProxyFinalized:
@@ -112,19 +114,19 @@ namespace jNet.RPC.Client
                             break;
 
                         case SocketMessage.SocketMessageType.EventNotification:
-                            _notificationExecutor.Queue(() =>
+                            var notifyObject = _referenceResolver.ResolveReference(message.DtoGuid);
+                            if (notifyObject is null)
+                                Logger.Debug("Proxy to notify not found for message: {0}, notification was {1}", message, deserialized);
+                            else
                             {
-                                var notifyObject = _referenceResolver.ResolveReference(message.DtoGuid);
-                                if (notifyObject == null)
-                                    Logger.Debug("Proxy to notify not found for message: {0}", message);
-                                else
-                                    notifyObject.OnNotificationMessage(message);
-                            });
+                                EventArgs eventArgs = deserialized as EventArgs;
+                                _notificationExecutor.Queue(() => notifyObject.OnNotificationMessage(message.MemberName, eventArgs));
+                            }
                             break;
 
                         default:
                             if (_requests.TryGetValue(message.MessageGuid, out var request))
-                                request.SetResult(message);
+                                request.SetResult(message.MessageType, deserialized);
                             else
                                 Logger.Warn("Unexpected message arrived from server: {0}", message);
                             break;
@@ -136,12 +138,12 @@ namespace jNet.RPC.Client
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error(ex, "Unexpected error in MessageHandler");
+                    Logger.Error(ex, "Unexpected error in MessageHandlerProc");
                 }
             }
         }
 
-        internal T Deserialize<T>(SocketMessage message)
+        internal object Deserialize(SocketMessage message)
         {
             using (var valueStream = message.GetValueStream())
             {
@@ -150,35 +152,23 @@ namespace jNet.RPC.Client
                 using (var reader = new StreamReader(valueStream, Encoding.Default, false))
                 using (var jsonReader = new JsonTextReader(reader))
                 {
-                    T obj = default;
-                    // There are cases when the deserialization is called same time from message handler and notification threads simultaneously,
-                    // and the notification call is deserialized before the actual object is deserialized.
-                    // That may lead to unnecessary ProxyMissing communication with the server.
-                    // From other side, it should be possible to call deserialization the above threads to avoid deadlocks when notification passes object during finalization.
-                    // It's better to wait a while instead of starting the comminication; however, it may still happen in edge cases.
-                    if (Monitor.TryEnter(_deserializeLock, DeserializeLockTimeout))
+#if DEBUG
+                    Logger.Trace("Deserializing message:\n{0}", message.ValueString);
+#endif
+                    var deserialized = _serializer.Deserialize(jsonReader);
+                    if (deserialized == null)
+                        return default;
+                    if (deserialized is ProxyObjectBase deserializedProxy && _referenceResolver.TryTakeProxyToPopulate(deserializedProxy.DtoGuid, out var proxyToPopulate))
                         try
                         {
-                            Logger.Trace("Deserializing:\n{0}", message.ValueString);
-                            obj = (T)_serializer.Deserialize(jsonReader);
-                            if (obj is ProxyObjectBase deserializedProxy && _referenceResolver.TryTakeProxyToPopulate(deserializedProxy.DtoGuid, out var proxyToPopulate))
-                                try
-                                {
-                                    reader.BaseStream.Position = 0;
-                                    _serializer.Populate(reader, proxyToPopulate);
-                                }
-                                catch (Exception ex)
-                                {
-                                    Logger.Error(ex, "Error when populating {0}", deserializedProxy.DtoGuid);
-                                }
+                            reader.BaseStream.Position = 0;
+                            _serializer.Populate(reader, proxyToPopulate);
                         }
-                        finally
+                        catch (Exception ex)
                         {
-                            Monitor.Exit(_deserializeLock);
+                            Logger.Error(ex, "Error when populating {0}", deserializedProxy.DtoGuid);
                         }
-                    else
-                        Logger.Warn("Deserialize lock timeout for {0}", typeof(T));
-                    return obj;
+                    return deserialized;
                 }
             }
         }

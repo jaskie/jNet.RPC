@@ -85,7 +85,7 @@ namespace jNet.RPC.Server
                 {
                     listener.Stop();
                     List<ServerSession> serverSessionsCopy;
-                    lock (((IList) _clients).SyncRoot)
+                    lock (((IList)_clients).SyncRoot)
                         serverSessionsCopy = _clients.ToList();
                     serverSessionsCopy.ForEach(s => s.Dispose());
                 }
@@ -107,7 +107,7 @@ namespace jNet.RPC.Server
         private void ClientSessionDisconnected(object sender, EventArgs e)
         {
             var serverSession = sender as ServerSession ?? throw new ArgumentException(nameof(sender));
-            lock (((IList) _clients).SyncRoot)
+            lock (((IList)_clients).SyncRoot)
                 _clients.Remove(serverSession);
             serverSession.Disconnected -= ClientSessionDisconnected;
             serverSession.Dispose();
@@ -117,7 +117,7 @@ namespace jNet.RPC.Server
         {
             get
             {
-                lock (((IList) _clients).SyncRoot)
+                lock (((IList)_clients).SyncRoot)
                     return _clients.Count;
             }
         }

@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Threading;
 using System.Xml.Serialization;
 
 namespace jNet.RPC.Server
@@ -48,8 +47,5 @@ namespace jNet.RPC.Server
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-
     }
-
-
 }

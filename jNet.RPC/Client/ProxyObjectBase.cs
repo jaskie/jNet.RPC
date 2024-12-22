@@ -92,7 +92,7 @@ namespace jNet.RPC.Client
             }
         }
 
-        protected internal abstract void OnEventNotification(SocketMessage message);
+        protected internal abstract void OnEventNotification(string eventName, EventArgs eventArgs);
 
         protected void NotifyPropertyChanged(string propertyName)
         {
@@ -107,15 +107,15 @@ namespace jNet.RPC.Client
 
         protected internal T DeserializeEventArgs<T>(SocketMessage message) where T: EventArgs
         {
-            return _client?.Deserialize<T>(message);
+            return _client?.Deserialize(message) as T;
         }
 
-        internal void OnNotificationMessage(SocketMessage message)
+        internal void OnNotificationMessage(string eventName, EventArgs eventArgs)
         {
-            Logger.Trace("On NotificationMessage {0}", message);
-            if (message.MemberName == nameof(INotifyPropertyChanged.PropertyChanged))
+            Logger.Trace("On NotificationMessage {0}", eventName);
+            if (eventName == nameof(INotifyPropertyChanged.PropertyChanged))
             {
-                var eav = DeserializeEventArgs<PropertyChangedWithValueEventArgs>(message);
+                var eav = eventArgs as PropertyChangedWithValueEventArgs;
                 if (eav == null)
                     return;
                 var type = GetType();
@@ -138,7 +138,7 @@ namespace jNet.RPC.Client
                 }
                 NotifyPropertyChanged(eav.PropertyName);
             }
-            else OnEventNotification(message);
+            else OnEventNotification(eventName, eventArgs);
         }
 
         protected FieldInfo GetField(Type t, string fieldName)
