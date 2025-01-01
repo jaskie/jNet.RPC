@@ -84,7 +84,7 @@ namespace ClientApp.ViewModel
             while (!_isDisposed && _remoteClient is null)
                 try
                 {
-                    _remoteClient = new RemoteClient(address, Application.Current.Dispatcher);
+                    _remoteClient = new RemoteClient(address);
                 }
                 catch { }
             if (_remoteClient is null)

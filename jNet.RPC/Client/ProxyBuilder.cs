@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -14,7 +12,6 @@ namespace jNet.RPC.Client
         private readonly ModuleBuilder _moduleBuilder;
         private readonly AssemblyBuilder _asmBuilder;
         private readonly Type _proxyBaseType;
-
 
         public ProxyBuilder(Type proxyBaseType)
         {
@@ -39,34 +36,34 @@ namespace jNet.RPC.Client
                 .Where(i => _proxyBaseType.GetEvent(i.Name) == null) // only add events that are not already implemented in base class
                 .ToArray();
             var fields = new FieldBuilder[events.Length];
-            for (int i = 0; i < events.Length; i++)
-                fields[i] = AddEvent(typeBuilder, events[i]);
-            AddMethodOnEventNotification(typeBuilder, events, fields);
+            if (events.Length > 0)
+            {
+                for (int i = 0; i < events.Length; i++)
+                    fields[i] = AddEvent(typeBuilder, events[i]);
+                AddOnEventNotificationOverride(typeBuilder, events, fields);
+            }
             return typeBuilder.CreateType();
         }
 
-        private void AddMethodOnEventNotification(TypeBuilder typeBuilder, EventInfo[] events, FieldInfo[] eventFields)
+        private void AddOnEventNotificationOverride(TypeBuilder typeBuilder, EventInfo[] events, FieldInfo[] eventFields)
         {
-            var originalMethod = _proxyBaseType.GetMethod(nameof(ProxyObjectBase.OnEventNotification), BindingFlags.Instance | BindingFlags.NonPublic);
-            var method = typeBuilder.DefineMethod(originalMethod.Name, MethodAttributes.Virtual | MethodAttributes.Family, typeof(void), new Type[] { typeof(SocketMessage) });
-            var deserializeMethod = _proxyBaseType.GetMethod(nameof(ProxyObjectBase.DeserializeEventArgs), BindingFlags.Instance | BindingFlags.NonPublic);
-            var stringEquals = typeof(string).GetMethod(nameof(string.Equals), BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(string), typeof(string) }, null);
-            var parameter = method.DefineParameter(0, ParameterAttributes.In, "message");
-            var socketMessage_MemberNameField = typeof(SocketMessage).GetField(nameof(SocketMessage.MemberName));
-            var ilGen = method.GetILGenerator();
+            var baseMethod = _proxyBaseType.GetMethod(nameof(ProxyObjectBase.OnEventNotification), BindingFlags.Instance | BindingFlags.NonPublic);
+            var onEventNotificationMethod = typeBuilder.DefineMethod(baseMethod.Name, MethodAttributes.Virtual | MethodAttributes.Family, typeof(void), new Type[] { typeof(string), typeof(EventArgs) });
+            var stringEqualsMethod = typeof(string).GetMethod(nameof(string.Equals), BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(string), typeof(string) }, null);
+            var ilGen = onEventNotificationMethod.GetILGenerator();
             var caseLabels = events.Select(l => ilGen.DefineLabel()).ToArray();
             var retLabel = ilGen.DefineLabel();
-            var memberName = ilGen.DeclareLocal(typeof(string));
-            // determine MemberName from provided SocketMessage and store it in memberName local variable
-            ilGen.Emit(OpCodes.Ldarg_1);
-            ilGen.Emit(OpCodes.Ldfld, socketMessage_MemberNameField);
-            ilGen.Emit(OpCodes.Stloc, memberName);
+            //var memberName = ilGen.DeclareLocal(typeof(string));
+            //// determine MemberName from provided SocketMessage and store it in memberName local variable
+            //ilGen.Emit(OpCodes.Ldarg_1);
+            //ilGen.Emit(OpCodes.Ldfld, socketMessage_MemberNameField);
+            //ilGen.Emit(OpCodes.Stloc, memberName);
             // evaluations stack is now empty
             for (int i =  0; i < events.Length; i++)
             {
-                ilGen.Emit(OpCodes.Ldloc, memberName);
+                ilGen.Emit(OpCodes.Ldarg_0);
                 ilGen.Emit(OpCodes.Ldstr, events[i].Name);
-                ilGen.Emit(OpCodes.Call, stringEquals); // compare event name with the one pro
+                ilGen.Emit(OpCodes.Call, stringEqualsMethod); // compare event name with the one provided
                 ilGen.Emit(OpCodes.Brtrue_S, caseLabels[i]);
             }
             // evaluations stack is now empty again
@@ -88,8 +85,8 @@ namespace jNet.RPC.Client
                 {
                     ilGen.Emit(OpCodes.Ldarg_0); // deserialize and load EventArgs onto stack
                     ilGen.Emit(OpCodes.Ldarg_1);
-                    var deserialize = deserializeMethod.MakeGenericMethod(events[i].EventHandlerType.GenericTypeArguments);
-                    ilGen.Emit(OpCodes.Call, deserialize); 
+                    //var deserialize = deserializeMethod.MakeGenericMethod(events[i].EventHandlerType.GenericTypeArguments);
+                    //ilGen.Emit(OpCodes.Call, deserialize); 
                 } 
                 else // provide EventArgs.Empty to event handler method
                     ilGen.Emit(OpCodes.Ldsfld, typeof(EventArgs).GetField(nameof(EventArgs.Empty), BindingFlags.Static | BindingFlags.Public));
@@ -99,7 +96,7 @@ namespace jNet.RPC.Client
             }
             ilGen.MarkLabel(retLabel);
             ilGen.Emit(OpCodes.Ret);
-            typeBuilder.DefineMethodOverride(method, originalMethod);
+            typeBuilder.DefineMethodOverride(onEventNotificationMethod, baseMethod);
         }
 
         private void AddProperty(TypeBuilder typeBuilder, PropertyInfo property)

@@ -120,7 +120,7 @@ namespace jNet.RPC.Client
                             else
                             {
                                 EventArgs eventArgs = deserialized as EventArgs;
-                                _notificationExecutor.Queue(() => notifyObject.OnNotificationMessage(message.MemberName, eventArgs));
+                                _notificationExecutor.Queue(() => notifyObject.OnEventNotification(message.MemberName, eventArgs));
                             }
                             break;
 

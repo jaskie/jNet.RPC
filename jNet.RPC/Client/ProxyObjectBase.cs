@@ -92,8 +92,6 @@ namespace jNet.RPC.Client
             }
         }
 
-        protected internal abstract void OnEventNotification(string eventName, EventArgs eventArgs);
-
         protected void NotifyPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -105,12 +103,12 @@ namespace jNet.RPC.Client
             _client = (RemoteClient)context.Context;
         }
 
-        protected internal T DeserializeEventArgs<T>(SocketMessage message) where T: EventArgs
-        {
-            return _client?.Deserialize(message) as T;
-        }
-
-        internal void OnNotificationMessage(string eventName, EventArgs eventArgs)
+        /// <summary>
+        /// This method provides default PropertyChanged event handling. Override it to support more events.
+        /// </summary>
+        /// <param name="eventName">Event name. Event with this name have to be defined in interface.</param>
+        /// <param name="eventArgs">Event args, deserialized according to type info. Cast it to specific derived type/</param>
+        protected internal virtual void OnEventNotification(string eventName, EventArgs eventArgs)
         {
             Logger.Trace("On NotificationMessage {0}", eventName);
             if (eventName == nameof(INotifyPropertyChanged.PropertyChanged))
@@ -138,7 +136,6 @@ namespace jNet.RPC.Client
                 }
                 NotifyPropertyChanged(eav.PropertyName);
             }
-            else OnEventNotification(eventName, eventArgs);
         }
 
         protected FieldInfo GetField(Type t, string fieldName)
