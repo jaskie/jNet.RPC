@@ -119,7 +119,7 @@ namespace jNet.RPC.Client
                                 Logger.Debug("Proxy to notify not found for message: {0}, notification was {1}", message, deserialized);
                             else
                             {
-                                EventArgs eventArgs = deserialized as EventArgs;
+                                var eventArgs = deserialized as EventArgs;
                                 _notificationExecutor.Queue(() => notifyObject.OnEventNotification(message.MemberName, eventArgs));
                             }
                             break;

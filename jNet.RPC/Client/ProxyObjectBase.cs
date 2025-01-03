@@ -110,7 +110,6 @@ namespace jNet.RPC.Client
         /// <param name="eventArgs">Event args, deserialized according to type info. Cast it to specific derived type/</param>
         protected internal virtual void OnEventNotification(string eventName, EventArgs eventArgs)
         {
-            Logger.Trace("On NotificationMessage {0}", eventName);
             if (eventName == nameof(INotifyPropertyChanged.PropertyChanged))
             {
                 var eav = eventArgs as PropertyChangedWithValueEventArgs;
