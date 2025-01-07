@@ -5,7 +5,6 @@ using Tests.CommonLibrary;
 
 namespace Tests.ClientLibrary.Level1
 {
-    [DtoType(typeof(IMockRoot))]
     public class MockRoot : ProxyObjectBase, IMockRoot
     {
 #pragma warning disable CS0649
@@ -31,10 +30,6 @@ namespace Tests.ClientLibrary.Level1
         public IMockMember GetMockMember(int index)
         {
             return Query<IMockMember>(parameters: new object[] { index });
-        }
-
-        protected override void OnEventNotification(SocketMessage message)
-        {
         }
     }
 }

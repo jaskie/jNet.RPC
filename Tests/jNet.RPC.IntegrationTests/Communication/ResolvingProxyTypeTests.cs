@@ -85,34 +85,29 @@ namespace jNet.RPC.IntegrationTests.Communication
             var server = new ServerHost(1036, root);
             var client = new RemoteClient("127.0.0.1:1036");
             client.AddProxyAssembly(typeof(Tests.ClientLibrary.MockRoot).Assembly);
-
+            var clientRoot = client.GetRootObject<IMockRoot>();
             // act
-            var rootProxy = client.GetRootObject<IMockRoot>();
-            var reference = GetMockMember(rootProxy);
+            var reference = GetMockMember(clientRoot);
+            clientRoot.SimpleMethod(); // call something to flush reference in client
 
             // assert - proxy should exists
-            Assert.IsFalse(IsReferenceNull(reference));
+            Assert.IsTrue(reference.IsAlive);
 
             // act
             GC.Collect();
             GC.Collect();
 
             // assert - after GC run proxy should be destroyed
-            Assert.IsTrue(IsReferenceNull(reference));
+            Assert.IsFalse(reference.IsAlive);
 
             // cleanup
             client.Dispose();
             server.Dispose();
         }
-
+        
         private WeakReference GetMockMember(IMockRoot proxy)
         {
             return new WeakReference(proxy.GetMockMember(0));
-        }
-
-        private static bool IsReferenceNull(WeakReference reference)
-        {
-            return reference.Target is null;
         }
     }
 }

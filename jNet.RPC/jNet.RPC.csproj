@@ -7,11 +7,7 @@
     <AssemblyTitle>jNet.RPC</AssemblyTitle>
     <Description>JSON .Net RPC library</Description>
     <Product>jNet.RPC</Product>
-    <Copyright>2024</Copyright>
-    <RunAnalyzersDuringBuild>True</RunAnalyzersDuringBuild>
-    <RunAnalyzersDuringLiveAnalysis>True</RunAnalyzersDuringLiveAnalysis>
-    <AnalysisLevel>none</AnalysisLevel>
-    <EnableNETAnalyzers>False</EnableNETAnalyzers>
+    <Copyright>2025</Copyright>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

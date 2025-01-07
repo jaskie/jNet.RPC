@@ -53,6 +53,7 @@ namespace jNet.RPC.Client
             var ilGen = onEventNotificationMethod.GetILGenerator();
             var caseLabels = events.Select(l => ilGen.DefineLabel()).ToArray();
             var retLabel = ilGen.DefineLabel();
+            var baseMethodLabel = ilGen.DefineLabel();
 
             for (int i = 0; i < events.Length; i++)
             {
@@ -62,7 +63,7 @@ namespace jNet.RPC.Client
                 ilGen.Emit(OpCodes.Brtrue_S, caseLabels[i]);
             }
 
-            ilGen.Emit(OpCodes.Br, retLabel); // jump to return if no event matches
+            ilGen.Emit(OpCodes.Br, baseMethodLabel); // jump to return if no event matches
 
             for (int i = 0; i < events.Length; i++)
             {
@@ -82,6 +83,12 @@ namespace jNet.RPC.Client
                 ilGen.Emit(OpCodes.Callvirt, eventHandlerMethod); // call the event field with sender and args parameters from evaluation stack
                 ilGen.Emit(OpCodes.Br, retLabel); // jump to return after handling the event
             }
+
+            ilGen.MarkLabel(baseMethodLabel);
+            ilGen.Emit(OpCodes.Ldarg_0); // load 'this'
+            ilGen.Emit(OpCodes.Ldarg_1); // load event name
+            ilGen.Emit(OpCodes.Ldarg_2); // load EventArgs
+            ilGen.Emit(OpCodes.Call, baseMethod); // call base method
 
             ilGen.MarkLabel(retLabel);
             ilGen.Emit(OpCodes.Ret);
