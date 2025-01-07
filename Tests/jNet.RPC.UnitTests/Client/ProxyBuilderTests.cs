@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using jNet.RPC.Client;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace jNet.RPC.UnitTests.Client
 {
-    public interface IBuildedInterface
+    public interface IBuildedInterface: INotifyPropertyChanged
     {
         int IntValueGetOnlyProperty { get; }
         int IntValueSetOnlyProperty { set; }
@@ -26,10 +27,12 @@ namespace jNet.RPC.UnitTests.Client
         public PropertyNotFoundException(string message) : base(message) { }
     }
 
-    public abstract class ProxyBase
+    public abstract class ProxyBase: INotifyPropertyChanged
     {
         private readonly Dictionary<string, object> _propertyValues = new Dictionary<string, object>();
         private readonly Dictionary<string, object[]> _methodInvocationParameters = new Dictionary<string, object[]>();
+
+        public event PropertyChangedEventHandler PropertyChanged;
 
         protected void Set<T>(T value, string propertyName)
         {
@@ -57,12 +60,12 @@ namespace jNet.RPC.UnitTests.Client
 
         }
 
-        protected abstract void OnEventNotification(SocketMessage message);
-
-        protected internal T DeserializeEventArgs<T>(SocketMessage message) where T : EventArgs
+        protected internal virtual void OnEventNotification(string eventName, EventArgs eventArgs)
         {
-            return (T)message.Value;
+            if (eventName == nameof(INotifyPropertyChanged.PropertyChanged))
+                PropertyChanged?.Invoke(this, (PropertyChangedEventArgs)eventArgs);
         }
+
 
         internal T GetPropertyValue<T>(string propertyName)
         {
@@ -92,11 +95,6 @@ namespace jNet.RPC.UnitTests.Client
             if (delegateValue != null)
                 delegateValue.Method.Invoke(delegateValue.Target, new object[] { this, args});
         }
-
-        internal void CallOnEventNotification(string eventName, object eventArgs)
-        {
-            OnEventNotification(new SocketMessage(SocketMessage.SocketMessageType.EventNotification, Guid.Empty, eventName, 0, eventArgs));
-        }
     }
 
 
@@ -109,14 +107,19 @@ namespace jNet.RPC.UnitTests.Client
     [TestClass]
     public class ProxyBuilderTests
     {
-        private ProxyBuilder _proxyBuilder = new ProxyBuilder(typeof(ProxyBase));
+        private ProxyBuilder _sut = new ProxyBuilder(typeof(ProxyBase));
         private Type _proxyType;
 
         #region property tests
         [TestInitialize]
         public void Initialize()
         {
-            _proxyType = _proxyBuilder.GetProxyTypeFor(typeof(IBuildedInterface));
+            _proxyType = _sut.GetProxyTypeFor(typeof(IBuildedInterface));
+        }
+
+        private IBuildedInterface CreateProxy()
+        {
+            return Activator.CreateInstance(_proxyType) as IBuildedInterface;
         }
 
         [TestMethod]
@@ -134,7 +137,7 @@ namespace jNet.RPC.UnitTests.Client
         [TestMethod]
         public void ProxyBuilderTests_PropertyGetOnly()
         {
-            var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
+            var proxy = CreateProxy();
             var generator = new Random();
             for (int i = 0; i < 1000; i++)
             {
@@ -147,7 +150,7 @@ namespace jNet.RPC.UnitTests.Client
         [TestMethod]
         public void ProxyBuilderTests_PropertySetOnly()
         {
-            var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
+            var proxy = CreateProxy();
             var generator = new Random();
             for (int i = 0; i < 1000; i++)
             {
@@ -160,7 +163,7 @@ namespace jNet.RPC.UnitTests.Client
         [TestMethod]
         public void ProxyBuilderTests_PropertyGetAndSet()
         {
-            var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
+            var proxy = CreateProxy();
             var generator = new Random();
             for (int i = 0; i < 1000; i++)
             {
@@ -174,7 +177,7 @@ namespace jNet.RPC.UnitTests.Client
         [TestMethod]
         public void ProxyBuilderTests_ParameterPassing()
         {
-            var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
+            var proxy = CreateProxy();
             proxy.VoidVoidMethod();
             Assert.AreEqual(((ProxyBase)proxy).GetMethodInvocationParameters(nameof(IBuildedInterface.VoidVoidMethod)).Length, 0);
             var generator = new Random();
@@ -206,7 +209,7 @@ namespace jNet.RPC.UnitTests.Client
         [TestMethod]
         public void ProxyBuilderTests_MethodValueReturn()
         {
-            var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
+            var proxy = CreateProxy();
             var generator = new Random();
             
             for (int i = 0; i < 100; i++)
@@ -227,7 +230,7 @@ namespace jNet.RPC.UnitTests.Client
         [TestMethod]
         public void ProxyBuilderTests_SimpleEventInvokation()
         {
-            var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
+            var proxy = CreateProxy();
             int i = 0;
             EventHandler eventHandler = new EventHandler((s, e) =>
             {
@@ -236,7 +239,7 @@ namespace jNet.RPC.UnitTests.Client
             proxy.SimpleEvent += eventHandler;
             ((ProxyBase)proxy).RaiseEvent(nameof(IBuildedInterface.SimpleEvent), EventArgs.Empty);
             Assert.AreEqual(1, i);
-            ((ProxyBase)proxy).CallOnEventNotification(nameof(IBuildedInterface.SimpleEvent), null);
+            ((ProxyBase)proxy).OnEventNotification(nameof(IBuildedInterface.SimpleEvent), EventArgs.Empty);
             Assert.AreEqual(2, i);
             proxy.SimpleEvent -= eventHandler;
             ((ProxyBase)proxy).RaiseEvent(nameof(IBuildedInterface.SimpleEvent), EventArgs.Empty);
@@ -246,7 +249,7 @@ namespace jNet.RPC.UnitTests.Client
         [TestMethod]
         public void ProxyBuilderTests_GenericEventInvokation()
         {
-            var proxy = Activator.CreateInstance(_proxyType) as IBuildedInterface;
+            var proxy = CreateProxy();
             var args = new TestEventArgs { IntValue = 3243423 };
             int i = 0;
             EventHandler<TestEventArgs> eventHandler = new EventHandler<TestEventArgs>((s, e) =>
@@ -256,11 +259,39 @@ namespace jNet.RPC.UnitTests.Client
             proxy.GenericEvent += eventHandler;
             ((ProxyBase)proxy).RaiseEvent(nameof(IBuildedInterface.GenericEvent), args);
             Assert.AreEqual(1 * args.IntValue, i);
-            ((ProxyBase)proxy).CallOnEventNotification(nameof(IBuildedInterface.GenericEvent), args);
+            ((ProxyBase)proxy).OnEventNotification(nameof(IBuildedInterface.GenericEvent), args);
             Assert.AreEqual(2 * args.IntValue, i);
             proxy.GenericEvent -= eventHandler;
             ((ProxyBase)proxy).RaiseEvent(nameof(IBuildedInterface.GenericEvent), args);
             Assert.AreEqual(2 * args.IntValue, i);
+        }
+
+        [TestMethod]
+        public void ProxyBuilderTests_PropertyChangedEventIsCalled()
+        {
+            var proxy = CreateProxy();
+            int i = 0;
+            proxy.PropertyChanged += (s, e) =>
+            {
+                i++;
+            };
+            ((ProxyBase)proxy).OnEventNotification(nameof(INotifyPropertyChanged.PropertyChanged), new PropertyChangedEventArgs(nameof(IBuildedInterface.IntValueFullProperty)));
+            Assert.AreEqual(1, i);
+        }
+        
+        [DataTestMethod]
+        [DataRow("InvalidEventName")]
+        [DataRow(nameof(IBuildedInterface.SimpleEvent))]
+        public void ProxyBuilderTests_PropertyChangedEventIsNotCalled(string eventName)
+        {
+            var proxy = CreateProxy();
+            int i = 0;
+            proxy.PropertyChanged += (s, e) =>
+            {
+                i++;
+            };
+            ((ProxyBase)proxy).OnEventNotification(eventName, EventArgs.Empty);
+            Assert.AreEqual(0, i);
         }
 
     }

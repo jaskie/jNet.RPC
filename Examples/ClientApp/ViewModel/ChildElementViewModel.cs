@@ -1,9 +1,4 @@
 ﻿using SharedInterfaces;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ClientApp.ViewModel
 {
@@ -13,7 +8,7 @@ namespace ClientApp.ViewModel
         {
             ChildElement = childElement;
         }
-        
+
         public IChildElement ChildElement { get; }
 
     }

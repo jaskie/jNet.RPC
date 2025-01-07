@@ -29,8 +29,7 @@ namespace jNet.RPC.Client
             try
             {
                 var queryMessage = new SocketMessage(SocketMessage.SocketMessageType.RootQuery, Guid.Empty, null, 0, null);
-                var response = SendAndGetResponse<T>(queryMessage);
-                return response;
+                return SendAndGetResponse<T>(queryMessage);
             }
             catch (Exception e)
             {

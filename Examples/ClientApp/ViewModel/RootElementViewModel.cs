@@ -1,31 +1,34 @@
 ﻿using ClientApp.Helpers;
 using SharedInterfaces;
 using System;
-using System.Collections.ObjectModel;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Input;
-using System.Windows.Threading;
 
 namespace ClientApp.ViewModel
 {
     class RootElementViewModel: INotifyPropertyChanged, IDisposable
     {
         private ChildElementViewModel _selectedChildElement;
-
+        private readonly List<ChildElementViewModel> _childElements;
+        private readonly object _listLock = new object();
+        private readonly IRootElement _root;
         public RootElementViewModel(IRootElement root)
         {
-            Root = root;
+            _root = root;
             root.ChildAdded += Root_ChildAdded;
             root.ChildRemoved += Root_ChildRemoved;
             CommandAddChild = new UiCommand(AddChild);
             CommandRemoveChild = new UiCommand(RemoveChild, _ => SelectedChildElement != null);
-            ChildElements = new ObservableCollection<ChildElementViewModel>(root.GetChildrens().Select(c => new ChildElementViewModel(c)));
+            _childElements = new List<ChildElementViewModel>(root.GetChildrens().Select(c => new ChildElementViewModel(c)));
+            ChildElements = new CollectionViewSource { Source = _childElements }.View;
         }
 
-        public ObservableCollection<ChildElementViewModel> ChildElements { get; }
+        public ICollectionView ChildElements { get; }
 
         public ChildElementViewModel SelectedChildElement
         {
@@ -39,8 +42,6 @@ namespace ClientApp.ViewModel
             }
         }
 
-        public IRootElement Root { get; }
-
         public ICommand CommandAddChild { get; }
 
         public ICommand CommandRemoveChild { get; }
@@ -49,39 +50,63 @@ namespace ClientApp.ViewModel
 
         public void Dispose()
         {
-            Root.ChildAdded -= Root_ChildAdded;
-            Root.ChildRemoved -= Root_ChildRemoved;
+            _root.ChildAdded -= Root_ChildAdded;
+            _root.ChildRemoved -= Root_ChildRemoved;
         }
 
         private void AddChild(object _)
         {
-            Root.AddChild();
+            var child = _root.AddChild();
+            SelectedChildElement = AddChildToCollection(child);
         }
 
         private void RemoveChild(object _)
         {
-            Root.RemoveChild(SelectedChildElement.ChildElement);
+            _root.RemoveChild(SelectedChildElement.ChildElement);
         }
 
         private void Root_ChildRemoved(object sender, ChildEventArgs e)
         {
-            // the event is called from client thread
-            Application.Current.Dispatcher.Invoke(() =>
+            lock (_listLock)
             {
-                var vm = ChildElements.FirstOrDefault(c => c.ChildElement == e.ChildElement);
+                var vm = _childElements.FirstOrDefault(c => c.ChildElement == e.ChildElement);
                 Debug.Assert(!(vm is null));
-                ChildElements.Remove(vm);
-            });
+                _childElements.Remove(vm);
+            }
+            RefreshList();
         }
 
         private void Root_ChildAdded(object sender, ChildEventArgs e)
         {
-            // the event is called from client thread
-            Application.Current.Dispatcher.Invoke(() =>
+            AddChildToCollection(e.ChildElement);
+        }
+
+        private ChildElementViewModel AddChildToCollection(IChildElement child)
+        {
+            /// we can't be sure which method (<see cref="Root_ChildAdded(object, ChildEventArgs)"/>  or <see cref="AddChild(object)"/> 
+            /// will call this first, but we need to provide correct viewmodel to AddChild to select newly added item.
+            /// This is because notifications arives from other thread.
+            /// We also don't want to select items created by other client instances.
+            ChildElementViewModel vm;
+            lock (_listLock)
             {
-                var newVm = new ChildElementViewModel(e.ChildElement);
-                ChildElements.Add(newVm);
-            });
+                vm = _childElements.FirstOrDefault(c => c.ChildElement == child);
+                if (vm != null) // already added
+                    return vm;
+                vm = new ChildElementViewModel(child);
+                _childElements.Add(vm);
+            }
+            RefreshList();
+            return vm;
+        }
+
+        private void RefreshList()
+        {
+            Application.Current.Dispatcher.BeginInvoke((Action)(() =>
+            {
+                lock (_listLock)
+                    ChildElements.Refresh();
+            }));
         }
 
     }

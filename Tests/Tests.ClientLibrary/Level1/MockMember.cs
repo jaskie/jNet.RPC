@@ -32,9 +32,5 @@ namespace Tests.ClientLibrary.Level1
                 EventRemove(_propertyChanged);
             }
         }
-
-        protected override void OnEventNotification(SocketMessage message)
-        {
-        }
     }
 }

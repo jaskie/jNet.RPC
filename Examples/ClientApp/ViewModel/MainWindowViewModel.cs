@@ -7,6 +7,7 @@ using System.Configuration;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 
 namespace ClientApp.ViewModel
 {
@@ -90,8 +91,11 @@ namespace ClientApp.ViewModel
                 return;
             _remoteClient.Disconnected += RemoteClient_Disconnected;
             var root = _remoteClient.GetRootObject<IRootElement>();
-            RootElement = new RootElementViewModel(root);
-            IsConnecting = false;
+            Application.Current.Dispatcher.BeginInvoke((Action)(() =>
+            {
+                RootElement = new RootElementViewModel(root);
+                IsConnecting = false;
+            }));
         }
 
         private void RemoteClient_Disconnected(object sender, EventArgs e)

@@ -25,13 +25,14 @@ namespace ServerApp.Model
 
         public event EventHandler<ChildEventArgs> ChildRemoved;
 
-        public void AddChild()
+        public IChildElement AddChild()
         {
             var newChild = new ChildElement();
             newChild.Value = 75;
             lock (_sync)
                 _childElements.Add(newChild);
             ChildAdded?.Invoke(this, new ChildEventArgs(newChild));
+            return newChild;
         }
 
         public IChildElement[] GetChildrens()

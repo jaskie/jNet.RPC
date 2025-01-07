@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "Server + Client",
+    "Projects": [
+      {
+        "Path": "Examples\\ServerApp\\ServerApp.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "Examples\\ClientApp\\ClientApp.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

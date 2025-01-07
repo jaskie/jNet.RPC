@@ -21,9 +21,12 @@ namespace jNet.RPC
     {
         private const int MessageQueueCapacity =
 #if DEBUG 
-            1000;
+            10000;
 #else
             100000;
+#endif
+#if DEBUG
+        private readonly Random _random = new Random();
 #endif
         private const int MaxMessageSize = 0x4000000; // 64 MB
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
@@ -183,6 +186,10 @@ namespace jNet.RPC
                 try
                 {
                     var serializedMessage = _sendQueue.Take(DisconnectTokenSource.Token);
+#if DEBUG
+                    // Simulate network latency
+                    Thread.Sleep(_random.Next(5));
+#endif
                     Client.Client.Send(serializedMessage);
                 }
                 catch (OperationCanceledException)
@@ -250,6 +257,10 @@ namespace jNet.RPC
                         var message = new SocketMessage(dataBuffer, messageSize);
                         if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
                             Logger.Trace("Message received: {0}", message);
+#if DEBUG
+                        // Simulate network latency
+                        Thread.Sleep(_random.Next(5));
+#endif
                         _receiveQueue.Add(message);
                         messageSize = 0;
                         dataIndex = 0;

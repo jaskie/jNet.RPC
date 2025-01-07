@@ -292,7 +292,7 @@ namespace jNet.RPC.Server
         {
             NotifyClient(e.Dto, e, nameof(INotifyPropertyChanged.PropertyChanged));
         }
-        
+
         private T Deserialize<T>(SocketMessage message)
         {
             using (var stream = message.GetValueStream())

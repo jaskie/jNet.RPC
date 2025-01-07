@@ -32,9 +32,5 @@ namespace Tests.ClientLibrary.Level1.Level2.Level3
             return Query<IMockMember>(parameters: new object[] { index });
         }
 
-        protected override void OnEventNotification(SocketMessage message)
-        {
-        }
-
     }
 }
