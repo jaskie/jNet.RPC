@@ -76,7 +76,7 @@ namespace jNet.RPC.Client
 
                     if (!_requests.TryRemove(query.MessageGuid, out var _))
                     {
-                        Logger.Warn("SendAndGetResponse client trapped for message {0}", response);
+                        Logger.Error("SendAndGetResponse client trapped for message {0}", response);
                         return default;
                     }
                     if (response is null)
@@ -85,8 +85,7 @@ namespace jNet.RPC.Client
                         throw (Exception)response;
                     if (typeof(T).IsEnum)
                     {
-                        // TODO: find less triky way. The integer value from JSON is deserialized as encapsulated long, then casted to int and then to T using encapsulated object
-                        return (T)(object)(int)(long)response;
+                        return (T)Enum.ToObject(typeof(T), response);
                     }
                     return (T)response;
                 }
