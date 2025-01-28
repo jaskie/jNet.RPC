@@ -4,7 +4,6 @@ using System;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Text;
-using System.Threading;
 
 namespace jNet.RPC.Client
 {
@@ -31,21 +30,21 @@ namespace jNet.RPC.Client
             base.OnDispose();
         }
 
-        private void Resolver_ReferenceFinalized(ProxyObjectBase proxy)
+        private void Resolver_ReferenceFinalized(Guid guid)
         {
             Send(new SocketMessage(
                 SocketMessage.SocketMessageType.ProxyFinalized,
-                proxy.DtoGuid,
+                guid,
                 string.Empty,
                 0,
                 null));
         }
 
-        private void Resolver_ReferenceResurrected(ProxyObjectBase proxy)
+        private void Resolver_ReferenceResurrected(Guid guid)
         {
             Send(new SocketMessage(
                 SocketMessage.SocketMessageType.ProxyResurrected,
-                proxy.DtoGuid,
+                guid,
                 string.Empty,
                 0,
                 null));

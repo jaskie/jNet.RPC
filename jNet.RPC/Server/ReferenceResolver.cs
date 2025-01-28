@@ -171,7 +171,7 @@ namespace jNet.RPC.Server
 
                 removed.PropertyChanged -= Dto_PropertyChanged;
                 _knownDtos.Remove(dtoGuid);
-            }                            
+            }
         }
     }
 

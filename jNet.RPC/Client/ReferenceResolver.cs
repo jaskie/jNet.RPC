@@ -14,11 +14,11 @@ namespace jNet.RPC.Client
         private int _disposed;
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
-        private Action<ProxyObjectBase> _onReferenceFinalized;
-        private Action<ProxyObjectBase> _onReferenceResurected;
+        private Action<Guid> _onReferenceFinalized;
+        private Action<Guid> _onReferenceResurected;
         private Func<Guid, IDto> _onReferenceMissing;
 
-        public void SetCallbacks(Action<ProxyObjectBase> onReferenceFinalized, Action<ProxyObjectBase> onReferenceResurected, Func<Guid, IDto> onReferenceMissing)
+        public void SetCallbacks(Action<Guid> onReferenceFinalized, Action<Guid> onReferenceResurected, Func<Guid, IDto> onReferenceMissing)
         {
             _onReferenceFinalized = onReferenceFinalized;
             _onReferenceResurected = onReferenceResurected;
@@ -152,7 +152,7 @@ namespace jNet.RPC.Client
             }
             lock (((IDictionary)_knownDtos).SyncRoot)
                 _knownDtos.Add(proxy.DtoGuid, new WeakReference<ProxyObjectBase>(proxy, true));
-            _onReferenceResurected?.Invoke(proxy);
+            _onReferenceResurected?.Invoke(dtoGuid);
             proxy.Resurect();
             Logger.Debug("Resurected proxy {0} with {1}", dtoGuid, proxy);
             return true;
@@ -164,22 +164,21 @@ namespace jNet.RPC.Client
                 return;
             if (_disposed != default)
                 return;
+            var guid = proxy.DtoGuid;
             lock (((IDictionary)_finalizeRequested).SyncRoot)
             {
-                if (_finalizeRequested.ContainsKey(proxy.DtoGuid))
-                    Logger.Warn("Could not save proxy {0}", proxy.DtoGuid);
+                if (_finalizeRequested.ContainsKey(guid))
+                    Logger.Warn("Could not save proxy {0}", guid);
                 else
                 {
-                    _finalizeRequested[proxy.DtoGuid] = proxy;
-                    Logger.Trace("Saved proxy {0}", proxy.DtoGuid);
+                    _finalizeRequested[guid] = proxy;
+                    Logger.Trace("Saved proxy {0}", guid);
                 }
             }
+            _onReferenceFinalized?.Invoke(guid);
+            Logger.Trace("Deleting from knowndtos {0}", guid);
             lock (((IDictionary)_knownDtos).SyncRoot)
-            {
-                Logger.Trace("Deleting from knowndtos {0}", proxy.DtoGuid);
-                _knownDtos.Remove(proxy.DtoGuid);
-                _onReferenceFinalized?.Invoke(proxy);
-            }
+                _knownDtos.Remove(guid);
         }
 
         #region Properties only used in tests

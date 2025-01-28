@@ -22,6 +22,7 @@ namespace jNet.RPC.Server
         private readonly IPEndPoint _remoteAddress;
         private readonly IDto _rootObject;
         private readonly ReferenceResolver _referenceResolver = new ReferenceResolver();
+        private readonly object _sendLock = new object();
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
         public ServerSession(TcpClient client, IDto rootObject, IPrincipal sessionUser): base(client)
@@ -64,8 +65,7 @@ namespace jNet.RPC.Server
                 try
                 {
                     var message = TakeNextMessage();
-                    if (message.MessageType != SocketMessage.SocketMessageType.EventNotification)
-                        Logger.Trace("Processing message: {0}", message);
+                    Logger.Trace("Processing message: {0}", message);
                     if (message.MessageType == SocketMessage.SocketMessageType.RootQuery)
                     {
                         SendResponse(message, _rootObject);
@@ -224,6 +224,11 @@ namespace jNet.RPC.Server
             Send(new SocketMessage(message.MessageGuid, message.MessageType, message.DtoGuid, message.MemberName, response));
         }
 
+        protected override void Send(SocketMessage message)
+        {
+            lock (_sendLock)
+                base.Send(message);
+        }
 
         private void AddDelegate(IDto objectToInvoke, EventInfo ei)
         {

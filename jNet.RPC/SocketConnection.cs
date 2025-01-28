@@ -105,7 +105,7 @@ namespace jNet.RPC
 
         protected abstract IReferenceResolver GetReferenceResolver();
 
-        protected void Send(SocketMessage message)
+        protected virtual void Send(SocketMessage message)
         {
             if (_sendQueue.IsAddingCompleted)
                 return;
