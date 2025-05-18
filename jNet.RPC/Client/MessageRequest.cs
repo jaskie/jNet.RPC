@@ -7,14 +7,14 @@ namespace jNet.RPC.Client
     {
         private readonly ManualResetEvent _mutex = new ManualResetEvent(false);
         private object _result;
-        private SocketMessage.SocketMessageType? _socketMessageType;
+        private SocketMessageType? _socketMessageType;
 
         public void Dispose()
         {
             _mutex.Dispose();
         }
 
-        public void SetResult(SocketMessage.SocketMessageType socketMessageType, object result)
+        public void SetResult(SocketMessageType socketMessageType, object result)
         {
             _socketMessageType = socketMessageType;
             _result = result;
@@ -27,7 +27,7 @@ namespace jNet.RPC.Client
             return _result;
         }
 
-        public SocketMessage.SocketMessageType? MessageType => _socketMessageType;
+        public SocketMessageType? MessageType => _socketMessageType;
 
     }
 }

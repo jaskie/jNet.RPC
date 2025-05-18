@@ -4,23 +4,23 @@ using System.Reflection;
 
 namespace jNet.RPC.Client
 {
-    public class RemoteClient : ClientSession
+    public sealed class RemoteClient : ClientSession
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
         public RemoteClient(string address) : base(address)
         {
-            _serializer.SerializationBinder = new SerializationBinder();
+            Serializer.SerializationBinder = new SerializationBinder();
         }
 
         public RemoteClient(string address, ISerializationBinder serializationBinder) : base(address)
         {
-            _serializer.SerializationBinder = serializationBinder;
+            Serializer.SerializationBinder = serializationBinder;
         }
 
         public void AddProxyAssembly(Assembly assembly)
         {
-            var binder = _serializer.SerializationBinder as SerializationBinder ?? throw new ApplicationException($"SerializationBinder is not {typeof(SerializationBinder)}");
+            var binder = Serializer.SerializationBinder as SerializationBinder ?? throw new ApplicationException($"SerializationBinder is not {typeof(SerializationBinder)}");
             binder.AddProxyAssembly(assembly);
         }
 
@@ -28,8 +28,16 @@ namespace jNet.RPC.Client
         {
             try
             {
-                var queryMessage = new SocketMessage(SocketMessage.SocketMessageType.RootQuery, Guid.Empty, null, 0, null);
-                return SendAndGetResponse<T>(queryMessage);
+                var queryMessage = new SocketMessage(SocketMessageType.RootQuery, Guid.Empty, null, 0, null);
+                var result = SendAndGetResponse<T>(queryMessage);
+                if (result == null)
+                {
+                    if (ClientConnectionState != ClientConnectionState.Rejected)
+                        ClientConnectionState = ClientConnectionState.Disconnected;
+                }
+                else
+                    ClientConnectionState = ClientConnectionState.Connected;
+                return result;
             }
             catch (Exception e)
             {
@@ -43,7 +51,7 @@ namespace jNet.RPC.Client
             try
             {
                 var queryMessage = new SocketMessage(
-                    SocketMessage.SocketMessageType.MethodExecute,
+                    SocketMessageType.MethodExecute,
                     dto.DtoGuid,
                     methodName,
                     parameters.Length,
@@ -62,7 +70,7 @@ namespace jNet.RPC.Client
             try
             {
                 var queryMessage = new SocketMessage(
-                    SocketMessage.SocketMessageType.PropertyGet,
+                    SocketMessageType.PropertyGet,
                     dto.DtoGuid,
                     propertyName,
                     0,
@@ -82,7 +90,7 @@ namespace jNet.RPC.Client
             try
             {
                 var queryMessage = new SocketMessage(
-                    SocketMessage.SocketMessageType.MethodExecute,
+                    SocketMessageType.MethodExecute,
                     dto.DtoGuid,
                     methodName,
                     parameters.Length,
@@ -101,7 +109,7 @@ namespace jNet.RPC.Client
             try
             {
                 var queryMessage = new SocketMessage(
-                SocketMessage.SocketMessageType.PropertySet,
+                SocketMessageType.PropertySet,
                 dto.DtoGuid,
                 propertyName,
                 1,
@@ -120,7 +128,7 @@ namespace jNet.RPC.Client
             try
             {
                 var queryMessage = new  SocketMessage(
-                SocketMessage.SocketMessageType.EventAdd,
+                SocketMessageType.EventAdd,
                 dto.DtoGuid,
                 eventName,
                 0,
@@ -139,7 +147,7 @@ namespace jNet.RPC.Client
             try
             {
                 var queryMessage = new  SocketMessage(
-                SocketMessage.SocketMessageType.EventRemove,
+                SocketMessageType.EventRemove,
                 dto.DtoGuid,
                 eventName,
                 0,

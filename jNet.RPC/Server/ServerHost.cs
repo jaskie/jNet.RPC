@@ -7,7 +7,6 @@ using System.Net.Sockets;
 using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
-using NLog;
 
 namespace jNet.RPC.Server
 {
@@ -19,7 +18,7 @@ namespace jNet.RPC.Server
         private IPrincipalProvider _principalProvider;
         private readonly CancellationTokenSource _shutdownTokenSource;
         private readonly List<ServerSession> _clients = new List<ServerSession>();
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         public ushort ListenPort { get; private set; }
 
         public ServerHost(ushort listenPort, ServerObjectBase rootObject, IPrincipalProvider principalProvider = null)
@@ -60,11 +59,15 @@ namespace jNet.RPC.Server
                         TcpClient client = null;
                         try
                         {
-                            client = await Task.Run(() => listener.AcceptTcpClientAsync(), _shutdownTokenSource.Token);
+                            client = await Task.Run(async () => await listener.AcceptTcpClientAsync(), _shutdownTokenSource.Token);
                             var sessionUser = _principalProvider.GetPrincipal(client);
                             if (sessionUser == null)
                             {
+                                var response = new SocketMessage(SocketMessageType.Exception, Guid.Empty, string.Empty, 0, new UnauthorizedAccessException($"Identity not found"));
+                                var serializer = Newtonsoft.Json.JsonSerializer.Create(new Newtonsoft.Json.JsonSerializerSettings { TypeNameHandling = Newtonsoft.Json.TypeNameHandling.Objects });
+                                client.Client.Send(response.SerializeAndEncode(serializer));
                                 Logger.Warn($"Remote client {client.Client.RemoteEndPoint} not allowed");
+                                await Task.Delay(1000, _shutdownTokenSource.Token); // allow client to receive the message berfore closing the connection
                                 client.Close();
                             }
                             else

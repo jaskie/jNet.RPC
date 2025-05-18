@@ -2,7 +2,6 @@
 using System;
 using System.ComponentModel;
 using System.IO;
-using System.Linq;
 
 namespace jNet.RPC.UnitTests
 {
@@ -12,15 +11,13 @@ namespace jNet.RPC.UnitTests
 
         private class DtoMock : IDto
         {
-            public Guid DtoGuid { get; } = Guid.NewGuid();
+            public Guid DtoGuid { get; set; } = Guid.NewGuid();
 
 #pragma warning disable CS0067 // The event 'SocketMessageTests.DtoMock.PropertyChanged' is never used
             public event PropertyChangedEventHandler PropertyChanged;
 #pragma warning restore CS0067 // The event 'SocketMessageTests.DtoMock.PropertyChanged' is never used
 
-            public void Dispose()
-            {
-            }
+            public Guid SomeValue { get; set; } = Guid.NewGuid();
         }
 
         [TestMethod]
@@ -28,27 +25,34 @@ namespace jNet.RPC.UnitTests
         {
             // arrange
             var dto = new DtoMock();
-            var memberName = "A_Member_Name";
-            var messageType = SocketMessage.SocketMessageType.EventNotification;
-            var parameterCount = 123;
+            const string memberName = "A_Member_Name";
+            const SocketMessageType messageType = SocketMessageType.PropertyGet;
+            const int parameterCount = 123;
             var valueStream = new MemoryStream();
             valueStream.Write(dto.DtoGuid.ToByteArray(), 0, 16);
-            var sourceMessage = new SocketMessage(messageType, dto.DtoGuid, memberName, parameterCount, null);
+            var sourceMessage = new SocketMessage(messageType, dto.DtoGuid, memberName, parameterCount, dto);
+            var serializer = Newtonsoft.Json.JsonSerializer.Create(new Newtonsoft.Json.JsonSerializerSettings { TypeNameHandling = Newtonsoft.Json.TypeNameHandling.All });
 
             // act
-            var encoded = sourceMessage.Encode(valueStream);
-            var length = BitConverter.ToInt32(encoded, 0);
-            var encodedWithoutLength = new byte[length];
-            Buffer.BlockCopy(encoded, sizeof(int), encodedWithoutLength, 0, encodedWithoutLength.Length);
-            var receivedMessage = new SocketMessage(encodedWithoutLength, length);
+            var serializedBytes = sourceMessage.SerializeAndEncode(serializer);
+            var messageContentLength = BitConverter.ToInt32(serializedBytes, 0);
+            var encodedWithoutLength = new byte[messageContentLength];
+            Buffer.BlockCopy(serializedBytes, sizeof(int), encodedWithoutLength, 0, encodedWithoutLength.Length);
+            var receivedMessage = new SocketMessage(encodedWithoutLength, messageContentLength);
+
+            DtoMock receivedDto = null;
+            using (var receivedObject = receivedMessage.GetValueStream())
+            using (var reader = new StreamReader(receivedObject, System.Text.Encoding.UTF8))
+                receivedDto = (DtoMock)serializer.Deserialize(reader, typeof(DtoMock));
 
             // assert
-            Assert.AreEqual(encoded.Length, length + sizeof(int));
+            Assert.AreEqual(serializedBytes.Length, messageContentLength + sizeof(int));
             Assert.AreEqual(messageType, receivedMessage.MessageType);
             Assert.AreEqual(memberName, receivedMessage.MemberName);
             Assert.AreEqual(dto.DtoGuid, receivedMessage.DtoGuid);
             Assert.AreEqual(parameterCount, receivedMessage.ParametersCount);
-            Assert.IsTrue(valueStream.ToArray().SequenceEqual(receivedMessage.GetValueStream().ToArray()));
+            Assert.AreEqual(dto.DtoGuid, receivedDto.DtoGuid);
+            Assert.AreEqual(dto.SomeValue, receivedDto.SomeValue);
         }
     }
 }

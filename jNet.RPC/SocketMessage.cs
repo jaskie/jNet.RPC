@@ -1,26 +1,13 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
 
 namespace jNet.RPC
 {
-    public class SocketMessage
+    internal sealed class SocketMessage
     {
-        public enum SocketMessageType: byte
-        {
-            RootQuery,
-            MethodExecute,
-            PropertyGet,
-            PropertySet,
-            EventAdd,
-            EventRemove,
-            EventNotification,
-            ProxyFinalized,
-            ProxyResurrected,
-            ProxyMissing,
-            Exception
-        }
         private const int GUID_LENGTH = 0x10;
         private readonly byte[] _valueData;
         private static readonly byte[] ContentLengthPlaceholder = new byte[sizeof(int)] { 0, 0, 0, 0 };
@@ -100,12 +87,19 @@ namespace jNet.RPC
         /// </summary>
         public readonly int ParametersCount;
 
-        public override string ToString()
+        internal byte[] SerializeAndEncode(JsonSerializer serializer)
         {
-            return $"{MessageGuid}:{MessageType}:{MemberName} for {DtoGuid}";
+            using (var serialized = new MemoryStream())
+            {
+                using (var writer = new StreamWriter(serialized, Encoding.Default, 1024, true))
+                {
+                    serializer.Serialize(writer, Value);
+                }
+                return Encode(serialized);
+            }
         }
 
-        internal byte[] Encode(Stream valueStream)
+        private byte[] Encode(Stream valueStream)
         {
             using (var stream = new MemoryStream())
             {
@@ -144,6 +138,11 @@ namespace jNet.RPC
 #if DEBUG
         public string ValueString => _valueData is null ? "null"  : Encoding.UTF8.GetString(_valueData);
 #endif
+
+        public override string ToString()
+        {
+            return $"{MessageGuid}:{MessageType}:{MemberName} for {DtoGuid}";
+        }
     }
 
     public class SocketMessageArrayValue 
@@ -152,6 +151,19 @@ namespace jNet.RPC
         public object[] Value;
     }
 
-
+    internal enum SocketMessageType : byte
+    {
+        RootQuery,
+        MethodExecute,
+        PropertyGet,
+        PropertySet,
+        EventAdd,
+        EventRemove,
+        EventNotification,
+        ProxyFinalized,
+        ProxyResurrected,
+        ProxyMissing,
+        Exception
+    }
 
 }

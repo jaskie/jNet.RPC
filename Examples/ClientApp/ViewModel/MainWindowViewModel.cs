@@ -1,11 +1,8 @@
 ﻿using jNet.RPC.Client;
 using SharedInterfaces;
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Configuration;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 
@@ -69,41 +66,45 @@ namespace ClientApp.ViewModel
                 return;
             _isDisposed = true;
             _rootElement?.Dispose();
-            if (_remoteClient is null)
-                return;
-            _remoteClient.Disconnected -= RemoteClient_Disconnected;
-            _remoteClient.Dispose();
-            _remoteClient = null;
+            CleanClient();
         }
 
-        private void Connect()
+        private async Task Connect()
         {
             var address = ConfigurationManager.AppSettings["RemoteEndpoint"];
             ConnectionMessage = $"Connecting to {address}";
             IsConnecting = true;
-            while (!_isDisposed && _remoteClient is null)
-                try
-                {
-                    _remoteClient = new RemoteClient(address);
-                }
-                catch { }
-            if (_remoteClient is null)
-                return;
+            while (!_isDisposed && _remoteClient?.ClientConnectionState != ClientConnectionState.Connecting)
+            {
+                if (CleanClient())
+                    await Task.Delay(5000);
+                _remoteClient = new RemoteClient(address);
+            }
             _remoteClient.Disconnected += RemoteClient_Disconnected;
             var root = _remoteClient.GetRootObject<IRootElement>();
-            Application.Current.Dispatcher.BeginInvoke((Action)(() =>
+            await Application.Current.Dispatcher.BeginInvoke((Action)(() =>
             {
                 RootElement = new RootElementViewModel(root);
                 IsConnecting = false;
             }));
         }
 
+        private bool CleanClient()
+        {
+            if (_remoteClient != null)
+            {
+                _remoteClient.Disconnected -= RemoteClient_Disconnected;
+                _remoteClient.Dispose();
+                _remoteClient = null;
+                return true;
+            }
+            return false;
+        }
+
         private void RemoteClient_Disconnected(object sender, EventArgs e)
         {
-            _remoteClient.Disconnected -= RemoteClient_Disconnected;
-            _remoteClient.Dispose();
-            _remoteClient = null;
-            Connect();
+            CleanClient();
+            Task.Run(Connect);
         }
     }
 }

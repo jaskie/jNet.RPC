@@ -15,7 +15,7 @@ using System.Threading;
 
 namespace jNet.RPC.Server
 {
-    internal class ServerSession : SocketConnection
+    internal sealed class ServerSession : SocketConnection
     {
         private readonly Dictionary<DelegateKey, Delegate> _delegates = new Dictionary<DelegateKey, Delegate>();
         private readonly IPrincipal _sessionUser;
@@ -29,7 +29,7 @@ namespace jNet.RPC.Server
         {
             _remoteAddress = client.Client.RemoteEndPoint as IPEndPoint ?? throw new ArgumentException("Client RemoteEndpoint is invalid");
             _sessionUser = sessionUser;
-            _serializer.SerializationBinder = new SerializationBinder();
+            Serializer.SerializationBinder = new SerializationBinder();
             _rootObject = rootObject;
             Logger.Info("Remote {0} from {1} successfully connected", _sessionUser.Identity, _remoteAddress);
             _referenceResolver.ReferencePropertyChanged += ReferenceResolver_ReferencePropertyChanged;
@@ -60,18 +60,18 @@ namespace jNet.RPC.Server
         protected override void MessageHandlerProc()
         {
             Thread.CurrentPrincipal = _sessionUser;
-            while (!DisconnectTokenSource.IsCancellationRequested)
+            while (!IsCancelled)
             {
                 try
                 {
                     var message = TakeNextMessage();
                     Logger.Trace("Processing message: {0}", message);
-                    if (message.MessageType == SocketMessage.SocketMessageType.RootQuery)
+                    if (message.MessageType == SocketMessageType.RootQuery)
                     {
                         SendResponse(message, _rootObject);
                         continue;
                     }
-                    if (message.MessageType == SocketMessage.SocketMessageType.ProxyMissing)
+                    if (message.MessageType == SocketMessageType.ProxyMissing)
                     {
                         var dto = _referenceResolver.FindMissingDto(message.DtoGuid);
                         SendResponse(message, dto);
@@ -83,7 +83,7 @@ namespace jNet.RPC.Server
                     {
                         switch (message.MessageType)
                         {
-                            case SocketMessage.SocketMessageType.MethodExecute:
+                            case SocketMessageType.MethodExecute:
                                 var objectToInvokeType = objectToInvoke.GetType();
                                 var methodToInvoke = objectToInvokeType.GetMethods()
                                     .FirstOrDefault(m => m.Name == message.MemberName &&
@@ -111,7 +111,7 @@ namespace jNet.RPC.Server
                                     throw new ApplicationException(
                                         $"Server: unknown method: {objectToInvoke}:{message.MemberName}");
                                 break;
-                            case SocketMessage.SocketMessageType.PropertyGet:
+                            case SocketMessageType.PropertyGet:
                                 var getProperty = objectToInvoke.GetType().GetProperty(message.MemberName);
                                 if (getProperty != null)
                                 {
@@ -131,7 +131,7 @@ namespace jNet.RPC.Server
                                     throw new ApplicationException(
                                         $"Server: unknown property: {objectToInvoke}:{message.MemberName}");
                                 break;
-                            case SocketMessage.SocketMessageType.PropertySet:
+                            case SocketMessageType.PropertySet:
                                 var setProperty = objectToInvoke.GetType().GetProperty(message.MemberName);
                                 if (setProperty != null)
                                 {
@@ -152,14 +152,14 @@ namespace jNet.RPC.Server
                                     throw new ApplicationException(
                                         $"Server: unknown property: {objectToInvoke}:{message.MemberName}");
                                 break;
-                            case SocketMessage.SocketMessageType.EventAdd:
-                            case SocketMessage.SocketMessageType.EventRemove:
+                            case SocketMessageType.EventAdd:
+                            case SocketMessageType.EventRemove:
                                 var ei = objectToInvoke.GetType().GetEvent(message.MemberName);
                                 if (ei != null)
                                 {
-                                    if (message.MessageType == SocketMessage.SocketMessageType.EventAdd)
+                                    if (message.MessageType == SocketMessageType.EventAdd)
                                         AddDelegate(objectToInvoke, ei);
-                                    else if (message.MessageType == SocketMessage.SocketMessageType.EventRemove)
+                                    else if (message.MessageType == SocketMessageType.EventRemove)
                                         RemoveDelegate(objectToInvoke, ei);
                                 }
                                 else
@@ -167,11 +167,11 @@ namespace jNet.RPC.Server
                                         $"Server: unknown event: {objectToInvoke}:{message.MemberName}");
                                 SendResponse(message, null);
                                 break;
-                            case SocketMessage.SocketMessageType.ProxyFinalized:
+                            case SocketMessageType.ProxyFinalized:
                                 _referenceResolver.RemoveReference(objectToInvoke.DtoGuid);
                                 SendResponse(message, null);
                                 break;
-                            case SocketMessage.SocketMessageType.ProxyResurrected:
+                            case SocketMessageType.ProxyResurrected:
                                 _referenceResolver.RestoreReference(objectToInvoke);
                                 break;
                         }
@@ -196,7 +196,7 @@ namespace jNet.RPC.Server
         private void SendException(SocketMessage message, Exception exception)
         {
             var value = new Exception(exception.Message, exception.InnerException == null ? null : new Exception(exception.InnerException.Message));
-            var response = new SocketMessage(message.MessageGuid, SocketMessage.SocketMessageType.Exception, message.DtoGuid, message.MemberName, value);
+            var response = new SocketMessage(message.MessageGuid, SocketMessageType.Exception, message.DtoGuid, message.MemberName, value);
             Send(response);
         }
 
@@ -224,7 +224,7 @@ namespace jNet.RPC.Server
             Send(new SocketMessage(message.MessageGuid, message.MessageType, message.DtoGuid, message.MemberName, response));
         }
 
-        protected override void Send(SocketMessage message)
+        private protected override void Send(SocketMessage message)
         {
             lock (_sendLock)
                 base.Send(message);
@@ -282,10 +282,10 @@ namespace jNet.RPC.Server
                     {
                         value = new PropertyChangedWithValueEventArgs(propertyChangedEventArgs.PropertyName, null);
                     }
-                    Send(new SocketMessage(SocketMessage.SocketMessageType.EventNotification, dto.DtoGuid, eventName, 0, value));
+                    Send(new SocketMessage(SocketMessageType.EventNotification, dto.DtoGuid, eventName, 0, value));
                 }
                 else
-                    Send(new SocketMessage(SocketMessage.SocketMessageType.EventNotification, dto.DtoGuid, eventName, 0, e));
+                    Send(new SocketMessage(SocketMessageType.EventNotification, dto.DtoGuid, eventName, 0, e));
             }
             catch (Exception exception)
             {
@@ -305,7 +305,7 @@ namespace jNet.RPC.Server
                 if (stream is null)
                     return default(T);
                 using (var reader = new StreamReader(stream, Encoding.Default, false))
-                    return (T)_serializer.Deserialize(reader, typeof(T));
+                    return (T)Serializer.Deserialize(reader, typeof(T));
             }
         }
     }
